@@ -83,6 +83,11 @@ class LoginFormManager:
         # Store OAuth code for late-connecting clients
         self._oauth_pending = {"url": str(page_url), "code": user_code}
         await self._broadcaster.emit("oauth_code_required", self._oauth_pending)
+        msg = f"🔑 Twitch Login Required: Please visit {page_url} and enter code: {user_code}"
+        if hasattr(self._manager, "output") and self._manager.output:
+            self._manager.output.print(msg)
+        else:
+            logger.info(msg)
         # Wait for user to confirm code entry (will be cancelled on shutdown)
         await self._login_event.wait()
         # Clear OAuth state after confirmation
