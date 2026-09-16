@@ -1,18 +1,14 @@
-# Twitch Drops Miner
+# Twitch Drops Miner (Mod by Murr)
 
-> Automatically mine timed Twitch Drops without streaming video or audio.
+> A high-performance, automated Twitch drops miner with **Start/Pause mining controls**, **dual-stack IPv4 & IPv6 Docker networking**, **web dashboard authentication**, and **headless remote deployment support**.
 
 <p align="center">
-  <a href="https://github.com/rangermix/TwitchDropsMiner/stargazers"><img src="https://img.shields.io/github/stars/rangermix/TwitchDropsMiner?style=for-the-badge&color=yellow" alt="GitHub stars"></a>
-  <a href="https://github.com/rangermix/TwitchDropsMiner/releases"><img src="https://img.shields.io/github/v/release/rangermix/TwitchDropsMiner?style=for-the-badge&color=brightgreen" alt="Latest release"></a>
-  <a href="https://hub.docker.com/r/rangermix/twitch-drops-miner"><img src="https://img.shields.io/docker/pulls/rangermix/twitch-drops-miner?style=for-the-badge&color=blue" alt="Docker pulls"></a>
-  <a href="https://github.com/rangermix/TwitchDropsMiner/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rangermix/TwitchDropsMiner?style=for-the-badge&color=orange" alt="License"></a>
+  <a href="https://github.com/vtstv"><img src="https://img.shields.io/badge/Mod%20by-Murr-blueviolet?style=for-the-badge&logo=github" alt="Mod by Murr"></a>
+  <a href="https://hub.docker.com/r/vtstv/twitch-drops-miner"><img src="https://img.shields.io/docker/pulls/vtstv/twitch-drops-miner?style=for-the-badge&color=blue" alt="Docker Pulls"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.12+-blue?style=for-the-badge&logo=python" alt="Python 3.12 or newer"></a>
+  <a href="https://github.com/rangermix/TwitchDropsMiner"><img src="https://img.shields.io/badge/Upstream-rangermix%2FTwitchDropsMiner-green?style=for-the-badge" alt="Upstream"></a>
+  <a href="https://github.com/vtstv/TwitchDropsMinerMod/blob/main/LICENSE"><img src="https://img.shields.io/github/license/vtstv/TwitchDropsMinerMod?style=for-the-badge&color=orange" alt="License"></a>
 </p>
-
-> [!TIP]
-> ⛏ **Looking for the customized Mod by Murr?** Check out [**README.mod.md**](./README.mod.md) for details on **Start/Pause mining controls**, **dual-stack IPv4 & IPv6 Docker networking**, **web dashboard authentication**, and **Windows 1-click launch scripts**.
-> 🔗 Mod Repository: [**vtstv/TwitchDropsMinerMod**](https://github.com/vtstv/TwitchDropsMinerMod)
 
 Twitch Drops Miner is a low-bandwidth, headless application that discovers eligible
 campaigns, selects an appropriate live channel, and tracks drop progress from a web
@@ -20,188 +16,143 @@ dashboard. It sends Twitch watch events without downloading the stream itself.
 
 ![Twitch Drops Miner web dashboard showing campaign progress, output, and channels](./screenshot.png)
 
-## Features
+---
 
-- **Low-bandwidth mining** — progresses timed drops without downloading video or audio
-- **Automatic campaign discovery** — detects active and upcoming drop campaigns
-- **Smart channel selection** — prioritizes eligible channels, preferred games, and viewers
-- **Drop-name ignore rules** — excludes unwanted reward names and dependent branches
-- **Persistent sessions** — saves OAuth login state between runs
-- **Web dashboard** — manages campaigns, channels, inventory, settings, and login status
-- **Optional dashboard password** — protects the web UI, API, and live connections with one password
-- **Drop history** — records every claimed drop locally (date, game, campaign, rewards)
-  with a filterable **History** tab, aggregated stats, and one-click **Export CSV**
-- **Telegram notifications** — sends an alert when a drop is claimed, including claims found during startup and inventory refresh
-- **Headless deployment** — runs locally, remotely, or in Docker without a desktop GUI
-- **Safe rendering** — builds dynamic translated content with DOM APIs instead of raw HTML
+## 🌟 Mod Enhancements & Key Features
 
-## Quick start
+This fork extends the upstream [rangermix/TwitchDropsMiner](https://github.com/rangermix/TwitchDropsMiner) with features specifically crafted for server hosting, VPS environments, containerization, and full mining control:
 
-### Docker (recommended)
+### 1. ⏸ Interactive Mining Controls (Start / Pause)
+Upstream operates in an always-on loop whenever eligible campaigns exist. This mod introduces complete control over the mining process without having to stop the web dashboard or container:
+- **Header Toggle Button**: One-click **Pause Mining** (red/amber) and **Start Mining** (glowing green) directly from the web navigation bar.
+- **Visual Status Badges**: Real-time status indicator (`⛏ MINING ACTIVE` vs. `⏸ MINING PAUSED`) in the status bar.
+- **Resource-Efficient Idle Mode**: When paused, channel stream watching and spade watch payload transmissions immediately cease while keeping the WebSocket connections, campaign listeners, and dashboard responsive.
+- **REST & WebSocket API**: Full programmatic control via `/api/mining/*` endpoints and live `mining_state` WebSocket broadcasts.
 
-Docker stores persistent application data in `/app/data`. The command below binds that
-directory to `./data` on the host:
+### 2. 🌐 Dual-Stack IPv4 & IPv6 Docker Networking
+Engineered for modern hosting providers, cloud VPS, and dual-stack / IPv6-only environments:
+- **Dynamic Interface Binding**: The web server binds via the `HOST` environment variable, defaulting to `::` on Linux/Alpine containers (enabling dual-stack IPv6 & IPv4 listening) and `0.0.0.0` on Windows.
+- **Host Network Mode Support**: Supports running with `--net=host` on Linux servers, eliminating Docker IPv6 NAT and port-forwarding issues.
+- **NAT64 / DNS64 Compatibility**: Works seamlessly on IPv6-only cloud instances accessing Twitch IPv4 endpoints via NAT64 gateways.
+- **Local Bridge Support**: Preconfigured for local development on Windows via Docker Desktop using port mapping `28088:8080`.
+
+### 3. 🔐 Dashboard Web Authentication
+- **Secure Web Panel Password**: Integrated dashboard password protection using scrypt password hashing, session tokens (`tdm_auth`), rate limiting (5 attempts/min per IP), and CSRF protection (`X-TDM-Request: 1`).
+- **Clean Single-Auth Architecture**: Removed conflicting HTTP Basic Auth popups to prevent browser re-authentication loops.
+- **Public Health Endpoints**: `/health` and `/healthz` endpoints remain accessible for Docker container health checks and reverse proxy monitoring without triggering authentication prompts.
+
+### 4. 🔑 Headless Twitch OAuth Device Activation
+- Displays the Twitch activation URL (`https://www.twitch.tv/activate`) and user code (e.g. `ABCD-EFGH`) directly in standard output (`stdout`) and the console log buffer.
+- Perfect for remote servers and headless VPS deployments: authenticate your Twitch account directly from an SSH terminal or `docker logs` without needing to immediately load the web interface.
+
+### 5. ⚡ Windows 1-Click Management Scripts
+- **`start.bat`**: Verifies Docker Desktop is running, starts the container in the background (`docker compose up -d`), and outputs the local dashboard URL (`http://localhost:28088`).
+- **`stop.bat`**: Gracefully stops the container with `docker compose down`.
+
+### 6. 🎨 Streamlined UI & Attribution
+- Clean, uncluttered UI footer with single credit attribution: `Mod by Murr`.
+- Responsive badges and controls with smooth transition animations.
+
+---
+
+## 🚀 Quick Start
+
+### Option A: Local Docker (Windows / macOS / Linux)
+
+1. Clone this repository:
+   ```bash
+   git clone -b mod https://github.com/vtstv/TwitchDropsMinerMod.git
+   cd TwitchDropsMinerMod
+   ```
+2. **On Windows**: Simply double-click `start.bat` (or run it from CMD/PowerShell).
+3. **On Linux / macOS**: Run Docker Compose:
+   ```bash
+   docker compose up -d
+   ```
+4. Open the web interface at **<http://localhost:28088>**.
+5. Log in to your Twitch account using the OAuth device code displayed on the screen or in `docker compose logs`.
+
+To stop the miner:
+- **Windows**: Double-click `stop.bat`.
+- **Linux / macOS**: Run `docker compose down`.
+
+---
+
+### Option B: Remote Linux VPS Deployment
+
+For a remote server (e.g. Ubuntu, Debian, Alpine VPS with IPv4/IPv6):
 
 ```bash
 docker run -d \
   --name twitch-drops-miner \
-  -p 8080:8080 \
-  -v "${PWD}/data:/app/data" \
+  --network host \
   --restart unless-stopped \
-  rangermix/twitch-drops-miner:latest
+  -e HOST=:: \
+  -e PORT=8080 \
+  -v /opt/twitch-drops-miner/data:/app/data \
+  -v /opt/twitch-drops-miner/logs:/app/logs \
+  vtstv/twitch-drops-miner:latest
 ```
 
-Open <http://localhost:8080>.
+> **Note**: Using `--network host` allows the container to bind directly to `[::]:8080`, accepting incoming traffic on both public IPv4 and IPv6 addresses. Ensure port `8080` is allowed in your firewall (`ufw allow 8080/tcp`).
 
-### Docker Compose
+View container logs to retrieve the Twitch OAuth code:
+```bash
+docker logs -f twitch-drops-miner
+```
 
-From the repository root, build and start the included
-[`docker-compose.yml`](./docker-compose.yml):
+---
+
+### Option C: Run from Source
+
+Requires **Python 3.12+**:
 
 ```bash
-docker compose up -d --build
+# Clone the repository
+git clone -b mod https://github.com/vtstv/TwitchDropsMinerMod.git
+cd TwitchDropsMinerMod
+
+# Install dependencies
+pip install -e .
+
+# Run the application
+python main.py
 ```
 
-### From source
+Then navigate to **<http://localhost:8080>**.
 
-Source installations require Python 3.12 or newer and
-[`uv`](https://docs.astral.sh/uv/):
+---
 
-```bash
-uv sync
-uv run main.py
-```
+## 📡 API Reference
 
-Then open <http://localhost:8080>.
+In addition to standard TwitchDropsMiner endpoints, this mod adds endpoints for external monitoring, home automation (Home Assistant, scripts), and integration:
 
-## Using the web app
+| Method | Endpoint | Description | Public / Auth |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/mining/status` | Returns `{"mining_enabled": true/false}` | Protected |
+| `POST` | `/api/mining/toggle` | Toggles mining between active and paused | Protected |
+| `POST` | `/api/mining/start` | Resumes mining activity | Protected |
+| `POST` | `/api/mining/stop` | Pauses mining activity | Protected |
+| `GET` | `/api/status` | Application status (includes `mining_enabled` field) | Protected |
+| `GET` | `/health` | Simple health check `{"status": "ok"}` | Public |
+| `GET` | `/healthz` | Container health check endpoint | Public |
 
-1. Log in with your Twitch account through the OAuth device flow.
-2. Wait for the miner to discover available campaigns.
-3. Choose the games you want to prioritize. You can also search for a game, select
-   **Add Game**, and then select **Reload**.
-4. Leave the miner running while it selects eligible channels and tracks drop progress.
+### WebSocket Events
+- **`mining_state`**: Emitted to connected clients on status changes:
+  ```json
+  { "mining_enabled": true }
+  ```
+- **`initial_state`**: Includes `mining_enabled: boolean` upon connection.
 
-In **Games to Watch**, drag games to reorder them or type a priority number to move a
-game directly. Priority 1 is highest; out-of-range numbers are clamped to the list ends.
-Blank or fractional values leave the order unchanged. Priority controls and remove buttons
-use translated labels for screen readers.
+---
 
-**Special Events** and **IRL** campaigns can be mined on their listed participating
-channels even when those channels stream another category or lack a drops-enabled flag.
-Include the campaign's category in **Games to Watch**. Channels must be live and eligible;
-campaigns without an enabled participating-channel list still require a matching category.
-Channels streaming categories outside Games to Watch retain the lowest automatic priority.
-When the watched channel goes offline or becomes ineligible, another eligible participant
-can replace it even at that same fallback priority.
+## 🛡️ Security & Privacy Notice
 
-Inventory filters combine **Active**, **Upcoming**, and **Expired** as alternatives.
-**Not Linked** narrows that status result, while fully claimed campaigns stay hidden
-until **Finished** is selected. Zero-minute subscription rewards are omitted from the
-Inventory and Wanted Drops Queue because they cannot be earned by watching. Individually
-expired and non-mineable rewards are also omitted from the queue, while upcoming and
-sequential rewards remain visible; successful claims refresh the queue immediately. The
-channel list matches game names case-insensitively and keeps the actively watched channel
-visible while game settings are changing. Campaign totals and claim messages count only
-rewards that can be earned by watching. Consecutive identical no-active-campaign console
-prompts are collapsed until another console message appears.
+- **Zero Credentials in Git**: All sensitive credentials, server configurations, SSH keys, and tokens are strictly excluded from source control via `.gitignore`.
+- **Protected Endpoints**: When Dashboard Password Protection is enabled in **Settings**, all API endpoints and WebSocket operations require valid session authentication.
+- **Reverse Proxy Recommended for Public Web**: When exposing port `8080` to the internet, use HTTPS via a reverse proxy (e.g. Caddy, Nginx, or Traefik) and enable password protection in the Settings tab.
 
-**Ignored Drop Keywords** in Settings is empty by default. Enter one literal substring per
-line; surrounding whitespace and blank lines are removed, and duplicates are collapsed
-case-insensitively while preserving the first spelling. Matching is also case-insensitive.
-A matching drop and every unclaimed branch that depends on it are ignored dynamically.
-Prerequisite-only branches with no remaining mineable reward are shown as skipped, while a
-prerequisite shared by an allowed reward remains mineable. Ignored and skipped drops are
-never reported as claimed. This controls what the miner intentionally targets, but Twitch
-may still grant simultaneous progress to an ignored reward while another reward advances.
-
-In **Settings**, **Clear All Cache** calls `POST /api/cache/clear` to discard local
-campaign, channel, and other derived miner state while preserving your OAuth login and
-settings, then reloads the data from Twitch. This is a recovery and diagnostic action;
-it cannot correct inaccurate campaign metadata returned by Twitch.
-
-### Dashboard password
-
-Password protection is **off by default**. In **Settings → Dashboard password**, enter
-and confirm a password (8–1024 characters), then select **Enable password protection**.
-This password is separate from your Twitch account; no username is needed. Enabling it
-immediately locks out other browsers. Mining continues while the dashboard is locked.
-
-If the login page shows a temporary request error, you can still enter your password
-and select **Log in** to retry without reloading the page.
-
-- Login uses an HttpOnly, SameSite=Strict **session cookie** by default. Select
-  **Remember me for 30 days** for a persistent cookie with a fixed 30-day expiry.
-  Sessions survive miner restarts, and all sessions have a maximum server lifetime of
-  30 days. Browser session-restore features may preserve session cookies; use **Log out**
-  to explicitly revoke a session on shared devices.
-- **Change password** requires the current password and signs out all other sessions.
-  The browser making the change receives a new session cookie.
-- **Disable protection and clear password** also requires the current password. It
-  deletes the stored password hash and all sessions, making the dashboard public again.
-- Passwords are salted and hashed with scrypt; only digests of random session tokens
-  are stored. Login and password-setting attempts are rate limited (5 per minute per
-  client IP, 30 per minute overall). Auth credentials never enter normal settings or logs.
-- The UI, application API, and Socket.IO are protected. `/healthz` stays public and
-  returns only a health flag for Docker checks. Login resources and auth status are public.
-  API writes require `X-TDM-Request: 1`; browser clients send it automatically. Cross-origin
-  writes and Socket.IO connections are rejected.
-
-**Remote access:** use HTTPS through a reverse proxy to encrypt passwords and cookies.
-Cookies receive the Secure flag over HTTPS. Preserve the original Host header and configure
-Uvicorn to trust forwarded protocol/IP headers **only from your proxy** (for example via
-`FORWARDED_ALLOW_IPS`). A proxy that hides client IPs shares the per-IP login limit.
-Configure protection on a trusted network before making the dashboard publicly reachable.
-Run one miner process per data directory.
-
-**Forgotten password:** stop the miner, restrict network access to its port, delete only
-`data/web_auth.json` (Docker: `/app/data/web_auth.json` in the mounted data directory),
-then restart and set a new password in Settings before restoring remote access. This
-resets dashboard authentication without deleting Twitch cookies or other settings.
-Keep the data directory private. A malformed auth file stops startup rather than silently
-turning off protection. **Clear All Cache** preserves dashboard authentication.
-
-### Drop history
-
-The **History** tab logs every successfully claimed drop to `data/drop_history.json`.
-Filter the table by game name or "claimed on or after" date, view per-game and per-month
-stats, or download the current view as a CSV file (UTF-8 BOM so Excel opens it cleanly).
-History controls are translated in all supported languages. The date filter starts at
-midnight UTC on the selected date; displayed claim times use your browser’s local timezone.
-CSV downloads support Unicode game names. Existing Twitch claims are not backfilled.
-The **Clear** button deletes all locally recorded history; this does not affect your
-Twitch account or already-claimed rewards.
-
-### Telegram notifications
-
-In **Settings → Telegram Notifications**, enter a bot token from
-[@BotFather](https://t.me/BotFather) and your chat ID. Start a conversation with your bot
-before selecting **Test Connection**. The Help tab contains the setup steps. A successful
-test sends a test message and saves the credentials; **Save Settings** saves without sending
-a message. A failed test or save displays an error.
-
-The bot token is stored on the server and is never returned to the browser. Leave the token
-field blank to reuse it when testing or changing the chat ID. To disable notifications,
-clear the chat ID and save. Enter a new chat ID to enable notifications again.
-
-Notifications cover new successful claims from both live events and inventory checks.
-Repeated events for an already claimed drop do not send another alert. Telegram delivery
-failures do not undo a Twitch claim, and failed notifications are not retried.
-
-> [!NOTE]
-> Your Twitch account must be linked to the relevant game accounts. Review your
-> [Twitch Drops campaigns](https://www.twitch.tv/drops/campaigns) before mining.
-
-## Important notes
-
-> [!WARNING]
-> Avoid watching Twitch manually with the same account while the miner is running.
-> Simultaneous viewing can cause drop-progress desynchronization.
-
-- Docker data is stored inside the container at `/app/data`; the examples persist it
-  to `./data` on the host.
-- Source installations store persistent data in the repository's `data/` directory.
-- Logs can be persisted separately by mounting `./logs:/app/logs`.
+---
 
 ## Contributing
 
@@ -230,22 +181,12 @@ Contributors are credited automatically when their pull requests are merged into
 | [@vurmil](https://github.com/vurmil) | [#12](https://github.com/rangermix/TwitchDropsMiner/pull/12) · [#17](https://github.com/rangermix/TwitchDropsMiner/pull/17) · [#18](https://github.com/rangermix/TwitchDropsMiner/pull/18) · [#100](https://github.com/rangermix/TwitchDropsMiner/pull/100) |
 <!-- contributors:end -->
 
-## Support
+## 📜 Credits & Acknowledgments
 
-If Twitch Drops Miner saves you time or bandwidth, you can support the project by:
-
-- [starring the repository](https://github.com/rangermix/TwitchDropsMiner)
-- [reporting an issue](https://github.com/rangermix/TwitchDropsMiner/issues) or
-  [submitting a pull request](https://github.com/rangermix/TwitchDropsMiner/pulls)
-- [buying the maintainer a coffee](https://buymeacoffee.com/rangermix)
-
-## Credits
-
-This project is a modern fork of
-[DevilXD/TwitchDropsMiner](https://github.com/DevilXD/TwitchDropsMiner), created by
-[@DevilXD](https://github.com/DevilXD). You can support the original author through
-[Buy Me a Coffee](https://www.buymeacoffee.com/DevilXD) or
-[Patreon](https://www.patreon.com/bePatron?u=26937862).
+- **Mod Author**: [Murr (vtstv)](https://github.com/vtstv)
+- **Upstream Project**: [rangermix/TwitchDropsMiner](https://github.com/rangermix/TwitchDropsMiner) by [@rangermix](https://github.com/rangermix)
+- **Original Application**: [DevilXD/TwitchDropsMiner](https://github.com/DevilXD/TwitchDropsMiner) by [@DevilXD](https://github.com/DevilXD)
+- Distributed under the [MIT License](LICENSE).
 
 <details>
 <summary>Original project and translation credits</summary>
@@ -283,39 +224,3 @@ This project is a modern fork of
   [@kilroy98](https://github.com/kilroy98)
 
 </details>
-
-## Development disclosure
-
-Repository instructions for all coding agents live in [AGENTS.md](./AGENTS.md).
-`CLAUDE.md` and `GEMINI.md` are relative symlinks to that file; edit `AGENTS.md` to
-update the shared guidance.
-
-This fork is maintained with AI-assisted development tools. Changes are validated through
-automated tests and code-quality checks, but users should still review updates before
-deploying them. The validation suite includes GraphQL watch events and batched channel
-discovery, alongside settings, full-locale translation schema and placeholder checks,
-and frontend safety checks. Use the software
-responsibly. Release automation verifies that the runtime, package, and lockfile versions
-match before publishing tags and Docker images. Docker validation and release jobs use
-the same pinned, Node-24-native Buildx and image-build action releases.
-The suite also covers ignored-keyword normalization, dependency branches, the combined
-expiry/ignore Wanted Queue guard, watch selection, API persistence, translated placeholder
-parity, frontend rendering, and the claimed-drop history store with CSV export and API
-endpoints. Any `web/static/app.js` or `web/static/styles.css` change
-must go through the release workflow so the application version and browser asset cache key
-are bumped before deployment.
-
-Telegram regression coverage includes Help translation rendering, saved-token reuse,
-disabling notifications, failed saves, claim deduplication, and mocked Telegram transport
-errors. From the activated environment, run:
-
-```bash
-python -m pytest tests/test_telegram_frontend.py tests/test_telegram_api.py tests/test_telegram_integration.py
-```
-
-No real Telegram messages are sent by these tests.
-
-Games to Watch supports Enter to add an exact or unique partial match. Ambiguous
-searches ask for a more specific name. Manual names and Deselect All require a
-confirmation; Escape cancels and keyboard focus stays in the dialog. Select All
-retains the existing priority order and manual entries, adding missing games only.
