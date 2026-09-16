@@ -80,8 +80,10 @@ if __name__ == "__main__":
         # Set up webapp references
         webapp.set_managers(client.gui, client)
         # Start web server in background
-        logger.info("Starting web server on http://0.0.0.0:8080")
-        web_server_task = asyncio.create_task(webapp.run_server(host="0.0.0.0", port=8080))
+        web_host = os.getenv("HOST", "::" if sys.platform != "win32" else "0.0.0.0")
+        web_port = int(os.getenv("PORT", "8080"))
+        logger.info(f"Starting web server on http://{web_host}:{web_port}")
+        web_server_task = asyncio.create_task(webapp.run_server(host=web_host, port=web_port))
 
         loop = asyncio.get_running_loop()
         if sys.platform == "linux":
