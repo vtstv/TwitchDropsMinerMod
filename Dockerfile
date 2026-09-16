@@ -15,7 +15,7 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.vendor="Murr" \
       org.opencontainers.image.title="Twitch Drops Miner (Mod by Murr)" \
-      org.opencontainers.image.description="Automated Twitch drops miner with web auth (env vars) and start/stop controls"
+      org.opencontainers.image.description="Automated Twitch drops miner with web dashboard auth and mining start/stop controls"
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
