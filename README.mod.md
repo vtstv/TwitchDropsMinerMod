@@ -54,8 +54,8 @@ Engineered for modern hosting providers, cloud VPS, and dual-stack / IPv6-only e
 
 1. Clone this repository:
    ```bash
-   git clone -b mod https://github.com/vtstv/TwitchDropsMiner.git
-   cd TwitchDropsMiner
+   git clone -b mod https://github.com/vtstv/TwitchDropsMinerMod.git
+   cd TwitchDropsMinerMod
    ```
 2. **On Windows**: Simply double-click `start.bat` (or run it from CMD/PowerShell).
 3. **On Linux / macOS**: Run Docker Compose:
@@ -102,8 +102,8 @@ Requires **Python 3.12+**:
 
 ```bash
 # Clone the repository
-git clone -b mod https://github.com/vtstv/TwitchDropsMiner.git
-cd TwitchDropsMiner
+git clone -b mod https://github.com/vtstv/TwitchDropsMinerMod.git
+cd TwitchDropsMinerMod
 
 # Install dependencies
 pip install -e .

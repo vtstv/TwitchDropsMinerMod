@@ -10,6 +10,10 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.12+-blue?style=for-the-badge&logo=python" alt="Python 3.12 or newer"></a>
 </p>
 
+> [!TIP]
+> ⛏ **Looking for the customized Mod by Murr?** Check out [**README.mod.md**](./README.mod.md) for details on **Start/Pause mining controls**, **dual-stack IPv4 & IPv6 Docker networking**, **web dashboard authentication**, and **Windows 1-click launch scripts**.
+> 🔗 Mod Repository: [**vtstv/TwitchDropsMinerMod**](https://github.com/vtstv/TwitchDropsMinerMod)
+
 Twitch Drops Miner is a low-bandwidth, headless application that discovers eligible
 campaigns, selects an appropriate live channel, and tracks drop progress from a web
 dashboard. It sends Twitch watch events without downloading the stream itself.
