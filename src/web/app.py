@@ -18,7 +18,6 @@ from pydantic import BaseModel
 from src.config.paths import DATA_DIR
 from src.version import __version__
 from src.web.auth import AuthAPI, AuthMiddleware, AuthSocketServer, WebAuth
-from src.web.auth_middleware import AuthMiddleware as BasicAuthMiddleware, is_authenticated_socket
 from starlette.middleware.cors import CORSMiddleware
 
 
@@ -37,7 +36,6 @@ app = FastAPI(title="Twitch Drops Miner Web", version=__version__)
 web_auth = WebAuth(DATA_DIR / "web_auth.json")
 sio = AuthSocketServer(web_auth)
 app.include_router(AuthAPI(web_auth, sio).router)
-app.add_middleware(BasicAuthMiddleware)
 app.add_middleware(AuthMiddleware, auth=web_auth)
 
 # Add CORS middleware
@@ -50,7 +48,7 @@ app.add_middleware(
 )
 
 # The outer guard covers Engine.IO polling and WebSocket upgrades too.
-socket_app = BasicAuthMiddleware(AuthMiddleware(socketio.ASGIApp(sio, app), web_auth))
+socket_app = AuthMiddleware(socketio.ASGIApp(sio, app), web_auth)
 
 
 @app.exception_handler(RequestValidationError)
@@ -543,9 +541,6 @@ async def exit_manual_mode():
 @sio.event
 async def connect(sid, environ):
     """Client connected"""
-    if not is_authenticated_socket(environ):
-        logger.warning(f"Rejecting unauthorized Web client: {sid}")
-        return False
     if not sio.register(sid, environ["asgi.scope"]):
         return False
     logger.info(f"Web client connected: {sid}")

@@ -11,6 +11,3 @@ services:
       - ./logs:/app/logs
     environment:
       - TZ=UTC
-      # Web UI Authentication (leave empty or commented out to disable)
-      # - WEB_USERNAME=admin
-      # - WEB_PASSWORD=your_secret_password
