@@ -19,6 +19,7 @@ from src.config.paths import DATA_DIR
 from src.version import __version__
 from src.web.auth import AuthAPI, AuthMiddleware, AuthSocketServer, WebAuth
 from src.web.auth_middleware import AuthMiddleware as BasicAuthMiddleware, is_authenticated_socket
+from starlette.middleware.cors import CORSMiddleware
 
 
 if TYPE_CHECKING:
