@@ -162,6 +162,16 @@ class WebGUIManager:
         """
         asyncio.create_task(self._broadcaster.emit("manual_mode_update", manual_mode_info))
 
+    def broadcast_mining_state(self, mining_enabled: bool):
+        """Broadcast mining state change to connected clients.
+
+        Args:
+            mining_enabled: Whether mining is active or paused
+        """
+        asyncio.create_task(
+            self._broadcaster.emit("mining_state", {"mining_enabled": mining_enabled})
+        )
+
     def get_wanted_game_tree(self) -> list[dict]:
         return self._stream_selector.get_wanted_game_tree(
             self._twitch.settings, self._twitch.inventory

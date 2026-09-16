@@ -68,6 +68,8 @@ class WatchService:
         Returns:
             True if the channel can be watched, False otherwise
         """
+        if not self._twitch.mining_enabled:
+            return False
         wanted_games = self._twitch.wanted_games
         if not wanted_games or not channel.online:
             return False
@@ -188,6 +190,11 @@ class WatchService:
 
         while True:
             channel: Channel = await self._twitch.watching_channel.get()
+
+            if not self._twitch.mining_enabled:
+                self.stop_watching()
+                await asyncio.sleep(1)
+                continue
 
             if not channel.online:
                 # if the channel isn't online anymore, we stop watching it

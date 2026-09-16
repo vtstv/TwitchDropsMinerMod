@@ -1,15 +1,16 @@
 services:
   twitch-drops-miner:
     build: .
+    image: vtstv/twitch-drops-miner:latest
     container_name: twitch-drops-miner
-    image: twitch-drops-miner:latest
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "28088:8080"
     volumes:
-      # Mount data directory for persistent storage
       - ./data:/app/data
       - ./logs:/app/logs
     environment:
-      # Set timezone (optional, defaults to UTC)
-      - TZ=Australia/Sydney
-    restart: unless-stopped
+      - TZ=UTC
+      # Web UI Authentication (leave empty or commented out to disable)
+      # - WEB_USERNAME=admin
+      # - WEB_PASSWORD=your_secret_password

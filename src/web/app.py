@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from src.config.paths import DATA_DIR
 from src.version import __version__
 from src.web.auth import AuthAPI, AuthMiddleware, AuthSocketServer, WebAuth
+from src.web.auth_middleware import AuthMiddleware as BasicAuthMiddleware, is_authenticated_socket
 
 
 if TYPE_CHECKING:
@@ -35,9 +36,20 @@ app = FastAPI(title="Twitch Drops Miner Web", version=__version__)
 web_auth = WebAuth(DATA_DIR / "web_auth.json")
 sio = AuthSocketServer(web_auth)
 app.include_router(AuthAPI(web_auth, sio).router)
+app.add_middleware(BasicAuthMiddleware)
 app.add_middleware(AuthMiddleware, auth=web_auth)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # The outer guard covers Engine.IO polling and WebSocket upgrades too.
-socket_app = AuthMiddleware(socketio.ASGIApp(sio, app), web_auth)
+socket_app = BasicAuthMiddleware(AuthMiddleware(socketio.ASGIApp(sio, app), web_auth))
 
 
 @app.exception_handler(RequestValidationError)
@@ -116,6 +128,12 @@ async def serve_index():
     )
 
 
+@app.get("/health")
+async def health_check():
+    """Simple health check endpoint"""
+    return {"status": "ok"}
+
+
 @app.get("/api/status")
 async def get_status():
     """Get current application status"""
@@ -126,7 +144,43 @@ async def get_status():
         "status": gui_manager.status.get(),
         "login": gui_manager.login.get_status(),
         "manual_mode": twitch_client.get_manual_mode_info(),
+        "mining_enabled": twitch_client.is_mining_enabled(),
     }
+
+
+@app.get("/api/mining/status")
+async def get_mining_status():
+    """Get current mining process status (enabled/paused)"""
+    if not twitch_client:
+        raise HTTPException(status_code=503, detail="Client not initialized")
+    return {"mining_enabled": twitch_client.is_mining_enabled()}
+
+
+@app.post("/api/mining/toggle")
+async def toggle_mining():
+    """Toggle mining process between active and paused"""
+    if not twitch_client:
+        raise HTTPException(status_code=503, detail="Client not initialized")
+    is_enabled = twitch_client.toggle_mining()
+    return {"mining_enabled": is_enabled}
+
+
+@app.post("/api/mining/start")
+async def start_mining():
+    """Resume mining process"""
+    if not twitch_client:
+        raise HTTPException(status_code=503, detail="Client not initialized")
+    twitch_client.resume_mining()
+    return {"mining_enabled": True}
+
+
+@app.post("/api/mining/stop")
+async def stop_mining():
+    """Pause mining process"""
+    if not twitch_client:
+        raise HTTPException(status_code=503, detail="Client not initialized")
+    twitch_client.pause_mining()
+    return {"mining_enabled": False}
 
 
 @app.get("/api/channels")
@@ -488,6 +542,9 @@ async def exit_manual_mode():
 @sio.event
 async def connect(sid, environ):
     """Client connected"""
+    if not is_authenticated_socket(environ):
+        logger.warning(f"Rejecting unauthorized Web client: {sid}")
+        return False
     if not sio.register(sid, environ["asgi.scope"]):
         return False
     logger.info(f"Web client connected: {sid}")
@@ -504,6 +561,7 @@ async def connect(sid, environ):
                 "settings": gui_manager.settings.get_settings(),
                 "login": gui_manager.login.get_status(),
                 "manual_mode": twitch_client.get_manual_mode_info(),
+                "mining_enabled": twitch_client.is_mining_enabled(),
                 "current_drop": gui_manager.progress.get_current_drop(),
                 "wanted_items": gui_manager.get_wanted_game_tree(),
             },

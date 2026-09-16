@@ -9,7 +9,8 @@ const state = {
     settings: {},
     currentDrop: null,
     countdownTimer: null,  // Track the active countdown timer
-    translations: {}  // Store current translations
+    translations: {},  // Store current translations
+    mining_enabled: true  // Track whether mining process is active or paused
 };
 
 // ==================== UI Utilities ====================
@@ -237,6 +238,15 @@ socket.on('initial_state', (data) => {
 
     if (data.wanted_items) {
         renderWantedItems(data.wanted_items);
+    }
+    if (data.mining_enabled !== undefined) {
+        updateMiningUI(data.mining_enabled);
+    }
+});
+
+socket.on('mining_state', (data) => {
+    if (data.mining_enabled !== undefined) {
+        updateMiningUI(data.mining_enabled);
     }
 });
 
@@ -2353,6 +2363,59 @@ async function clearAllCache() {
 }
 
 
+// ==================== Mining Process Control ====================
+
+function updateMiningUI(enabled) {
+    state.mining_enabled = enabled;
+    const btn = document.getElementById('mining-toggle-btn');
+    const icon = document.getElementById('mining-btn-icon');
+    const text = document.getElementById('mining-btn-text');
+    const badge = document.getElementById('mining-status-badge');
+
+    if (!btn) return;
+
+    if (enabled) {
+        btn.className = 'mining-toggle-btn mining-active';
+        btn.title = 'Click to pause mining process';
+        if (icon) icon.textContent = '⏸';
+        if (text) text.textContent = 'Pause Mining';
+        if (badge) {
+            badge.className = 'mode-badge mining-active-badge';
+            badge.textContent = '⛏ MINING ACTIVE';
+            badge.title = 'Mining process is running';
+        }
+    } else {
+        btn.className = 'mining-toggle-btn mining-paused';
+        btn.title = 'Click to resume mining process';
+        if (icon) icon.textContent = '▶';
+        if (text) text.textContent = 'Start Mining';
+        if (badge) {
+            badge.className = 'mode-badge mining-paused-badge';
+            badge.textContent = '⏸ MINING PAUSED';
+            badge.title = 'Mining process is paused';
+        }
+    }
+}
+
+async function toggleMining() {
+    const btn = document.getElementById('mining-toggle-btn');
+    if (btn) btn.disabled = true;
+    try {
+        const response = await fetch('/api/mining/toggle', { method: 'POST' });
+        if (response.ok) {
+            const data = await response.json();
+            updateMiningUI(data.mining_enabled);
+        } else {
+            console.error('Failed to toggle mining:', response.status);
+        }
+    } catch (err) {
+        console.error('Error toggling mining:', err);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+
 // ==================== Tab Management ====================
 
 function switchTab(tabName) {
@@ -2377,6 +2440,12 @@ function switchTab(tabName) {
 // ==================== Event Listeners ====================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Mining process toggle button
+    const miningBtn = document.getElementById('mining-toggle-btn');
+    if (miningBtn) {
+        miningBtn.addEventListener('click', toggleMining);
+    }
+
     // Fetch and display version information
     fetchAndDisplayVersion();
 

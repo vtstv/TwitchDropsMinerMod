@@ -18,6 +18,10 @@
             <div class="header-top">
                 <h1>🎮 Twitch Drops Miner</h1>
                 <div class="header-controls">
+                    <button id="mining-toggle-btn" class="mining-toggle-btn mining-active" title="Start or pause mining process">
+                        <span id="mining-btn-icon">⏸</span>
+                        <span id="mining-btn-text">Pause Mining</span>
+                    </button>
                     <button id="web-auth-logout" type="button" data-auth-text="logout" hidden>Log out</button>
                     <span id="web-auth-logout-result" role="status" aria-live="polite"></span>
                     <label for="language" class="language-selector">
@@ -29,6 +33,9 @@
                 </div>
             </div>
             <div class="status-bar">
+                <span id="mining-status-badge" class="mode-badge mining-active-badge" title="Mining process status">
+                    ⛏ MINING ACTIVE
+                </span>
                 <span id="status-text">Initializing...</span>
                 <span id="manual-mode-badge" class="mode-badge hidden"
                     title="Manual mode active - watching specific game">
@@ -518,6 +525,7 @@
             <div class="footer-content">
                 <div class="footer-version">
                     <span id="footer-version-text">Version: <span id="current-version">Loading...</span></span>
+                    <span class="footer-mod-credit"> | Mod by <a href="https://github.com/vtstv" target="_blank" rel="noopener noreferrer">Murr</a></span>
                     <span id="footer-update-indicator" style="display: none;" class="update-indicator">
                         <a href="#" id="footer-update-link" target="_blank" title="Click to download update">
                             ⚠ Update Available: <span id="latest-version"></span>

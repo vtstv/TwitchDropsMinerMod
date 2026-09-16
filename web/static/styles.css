@@ -1874,3 +1874,84 @@ header h1 {
     justify-content: flex-end;
     gap: 12px;
 }
+
+/* Custom modifications by Murr (github.com/vtstv) */
+.footer-mod-credit {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-left: 8px;
+}
+
+.footer-mod-credit a {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.footer-mod-credit a:hover {
+    text-decoration: underline;
+}
+
+/* Mining process toggle button */
+.mining-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease-in-out;
+}
+
+.mining-toggle-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.mining-toggle-btn.mining-active {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+.mining-toggle-btn.mining-active:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+.mining-toggle-btn.mining-paused {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border-color: rgba(34, 197, 94, 0.45);
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+}
+
+.mining-toggle-btn.mining-paused:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.25);
+    border-color: #22c55e;
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.4);
+}
+
+.mode-badge.mining-active-badge {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.mode-badge.mining-paused-badge {
+    background: rgba(234, 179, 8, 0.15);
+    color: #eab308;
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+}

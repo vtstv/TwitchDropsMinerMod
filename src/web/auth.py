@@ -153,7 +153,7 @@ class WebAuth:
 class AuthMiddleware:
     """Guard HTTP and Engine.IO before either application handles the request."""
 
-    PUBLIC = {"/login", "/healthz", "/api/auth/status", "/api/auth/login",
+    PUBLIC = {"/login", "/health", "/healthz", "/api/auth/status", "/api/auth/login",
               "/static/auth.js", "/static/auth.css", "/static/styles.css", "/static/favicon.png"}
 
     def __init__(self, app: ASGIApp, auth: WebAuth):

@@ -96,6 +96,43 @@ class Twitch:
         self._stream_selector: StreamSelector = StreamSelector()
         # Drop history
         self.drop_history: DropHistory = DropHistory(DATA_DIR)
+        # Mining process control (start/stop)
+        self.mining_enabled: bool = True
+
+    def is_mining_enabled(self) -> bool:
+        """Return whether mining is currently enabled."""
+        return self.mining_enabled
+
+    def pause_mining(self) -> None:
+        """Pause mining activity without terminating the application."""
+        if not self.mining_enabled:
+            return
+        self.mining_enabled = False
+        self.stop_watching()
+        self.change_state(State.IDLE)
+        self.print("⏸ Mining paused by user", collapse_key="mining.paused")
+        if self.gui:
+            self.gui.status.update("⏸ Mining paused")
+            self.gui.broadcast_mining_state(False)
+
+    def resume_mining(self) -> None:
+        """Resume mining activity."""
+        if self.mining_enabled:
+            return
+        self.mining_enabled = True
+        self.print("▶ Mining resumed by user", collapse_key="mining.resumed")
+        if self.gui:
+            self.gui.status.update("▶ Resuming mining...")
+            self.gui.broadcast_mining_state(True)
+        self.request_inventory_refresh()
+
+    def toggle_mining(self) -> bool:
+        """Toggle mining activity between paused and active."""
+        if self.mining_enabled:
+            self.pause_mining()
+        else:
+            self.resume_mining()
+        return self.mining_enabled
 
     def _ensure_api_clients(self) -> None:
         """Ensure API clients are initialized (called after GUI is set)."""
@@ -271,6 +308,12 @@ class Twitch:
         while True:
             self._activate_pending_inventory_refresh()
             self._activate_pending_games_update()
+            if not self.mining_enabled:
+                self.gui.status.update("⏸ Mining paused")
+                self.stop_watching()
+                self._state_change.clear()
+                await self._state_change.wait()
+                continue
             if self._state is State.IDLE:
                 self.gui.status.update(_.t["gui"]["status"]["idle"])
                 self.stop_watching()

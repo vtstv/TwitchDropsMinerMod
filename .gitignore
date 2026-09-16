@@ -29,3 +29,6 @@ data/
 .coverage
 
 artifacts/
+
+# Private credentials and deployment files
+prv/
