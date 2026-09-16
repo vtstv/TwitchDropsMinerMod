@@ -19,22 +19,24 @@ An automated, bandwidth-free Twitch drops miner with **Start/Pause controls**, *
 - **🌐 IPv4 & IPv6 Dual-Stack**: Binds to `::` on Linux/Docker, enabling native IPv6 and IPv4 traffic, host networking (`--network host`), and NAT64 compatibility.
 - **🔐 Dashboard Password Protection**: Protect the web interface and API with a password in **Settings** (salted scrypt hashing, session tokens).
 - **🔑 Headless Twitch OAuth**: Displays the Twitch activation URL and device code directly in terminal / `docker logs` for easy remote VPS setup.
-- **🚀 1-Click Windows Scripts**: `start.bat` and `stop.bat` to manage the Docker container with a double-click.
 - **📡 Mining Control API**: Simple REST endpoints to automate pausing and resuming mining via scripts or Home Assistant.
 
 ---
 
 ## 🚀 Quick Start
 
-### Windows (Docker)
+### Local Docker Compose
 1. Clone the repository:
    ```bash
    git clone https://github.com/vtstv/TwitchDropsMinerMod.git
    cd TwitchDropsMinerMod
    ```
-2. Double-click **`start.bat`**.
+2. Start the container:
+   ```bash
+   docker compose up -d
+   ```
 3. Open **<http://localhost:28088>**.
-4. To stop: double-click **`stop.bat`**.
+4. To stop: `docker compose down`.
 
 ### Linux / Remote VPS (Docker)
 Run with host networking (supports IPv4 and IPv6):
