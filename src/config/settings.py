@@ -51,23 +51,41 @@ default_settings = {
     "proxy": "",
     "telegram_bot_token": "",
     "telegram_chat_id": "",
+    "auto_reload_campaigns": True,
+    "campaign_reload_interval_minutes": 60,
+    "auto_add_new_games": True,
+    "randomize_behavior": True,
+    "random_jitter_seconds": 5,
+    "random_switch_delay": 10,
+    "random_breaks_enabled": False,
+    "random_break_interval_hours": 3,
+    "random_break_duration_minutes": 5,
 }
 
 
 @dataclass
 class Settings:
-    connection_quality: int
-    dark_mode: bool
-    drop_name_blacklist: list[str]
-    games_to_watch: list[str]
-    language: str
-    inventory_filters: InventoryFilters
-    inventory_list_view: bool
-    minimum_refresh_interval_minutes: int
-    mining_benefits: dict[str, bool]
-    proxy: str
-    telegram_bot_token: str
-    telegram_chat_id: str
+    connection_quality: int = 1
+    dark_mode: bool = False
+    drop_name_blacklist: list[str] = None
+    games_to_watch: list[str] = None
+    language: str = DEFAULT_LANG
+    inventory_filters: InventoryFilters = None
+    inventory_list_view: bool = False
+    minimum_refresh_interval_minutes: int = 30
+    mining_benefits: dict[str, bool] = None
+    proxy: str = ""
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    auto_reload_campaigns: bool = True
+    campaign_reload_interval_minutes: int = 60
+    auto_add_new_games: bool = True
+    randomize_behavior: bool = True
+    random_jitter_seconds: int = 5
+    random_switch_delay: int = 10
+    random_breaks_enabled: bool = False
+    random_break_interval_hours: int = 3
+    random_break_duration_minutes: int = 5
 
     def __init__(self):
         self.load()

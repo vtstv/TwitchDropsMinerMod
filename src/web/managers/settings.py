@@ -152,6 +152,36 @@ class SettingsManager:
         should_trigger_update |= self.check_and_update_setting(
             "mining_benefits", settings_data.get("mining_benefits"), True
         )
+        should_trigger_update |= self.check_and_update_setting(
+            "auto_reload_campaigns", settings_data.get("auto_reload_campaigns")
+        )
+        should_trigger_update |= self.check_and_update_setting(
+            "campaign_reload_interval_minutes",
+            settings_data.get("campaign_reload_interval_minutes"),
+        )
+        should_trigger_update |= self.check_and_update_setting(
+            "auto_add_new_games", settings_data.get("auto_add_new_games"), True
+        )
+        should_trigger_update |= self.check_and_update_setting(
+            "randomize_behavior", settings_data.get("randomize_behavior")
+        )
+        should_trigger_update |= self.check_and_update_setting(
+            "random_jitter_seconds", settings_data.get("random_jitter_seconds")
+        )
+        should_trigger_update |= self.check_and_update_setting(
+            "random_switch_delay", settings_data.get("random_switch_delay")
+        )
+        should_trigger_update |= self.check_and_update_setting(
+            "random_breaks_enabled", settings_data.get("random_breaks_enabled")
+        )
+        should_trigger_update |= self.check_and_update_setting(
+            "random_break_interval_hours",
+            settings_data.get("random_break_interval_hours"),
+        )
+        should_trigger_update |= self.check_and_update_setting(
+            "random_break_duration_minutes",
+            settings_data.get("random_break_duration_minutes"),
+        )
 
         self._settings.save()
         response_settings = self.get_settings(legacy_show_not_linked)
@@ -161,6 +191,10 @@ class SettingsManager:
             self._on_change()
 
         return response_settings
+
+    def broadcast_settings(self) -> None:
+        """Broadcast current settings to all connected clients."""
+        asyncio.create_task(self._broadcaster.emit("settings_updated", self.get_settings()))
 
     def _normalize_inventory_filters(self, updates: dict[str, Any]) -> dict[str, Any]:
         """Merge partial filter updates and discard legacy or unknown keys."""

@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from src.i18n import _
+
+
+logger = logging.getLogger("TwitchDrops")
 
 
 if TYPE_CHECKING:

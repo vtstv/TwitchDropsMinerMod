@@ -19,6 +19,8 @@ An automated, bandwidth-free Twitch drops miner with **Start/Pause controls**, *
 - **🌐 IPv4 & IPv6 Dual-Stack**: Binds to `::` on Linux/Docker, enabling native IPv6 and IPv4 traffic, host networking (`--network host`), and NAT64 compatibility.
 - **🔐 Dashboard Password Protection**: Protect the web interface and API with a password in **Settings** (salted scrypt hashing, session tokens).
 - **🔑 Headless Twitch OAuth**: Displays the Twitch activation URL and device code directly in terminal / `docker logs` for easy remote VPS setup.
+- **🔄 Campaign Auto-Reload & Game Discovery**: Periodically reloads active campaigns at configurable intervals and automatically adds newly discovered games to the watch list.
+- **🤖 Anti-Bot Behavior Simulation**: Adds human-like watch beacon jitter, channel switch delays, and optional periodic breaks to mimic authentic viewer habits.
 - **📡 Mining Control API**: Simple REST endpoints to automate pausing and resuming mining via scripts or Home Assistant.
 
 ---

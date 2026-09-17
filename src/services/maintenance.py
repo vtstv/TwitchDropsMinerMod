@@ -57,14 +57,21 @@ class MaintenanceService:
         3. After reaching the next hour boundary, request inventory reload
         """
         now = datetime.now(timezone.utc)
-        next_period = now + timedelta(
-            minutes=self._twitch.settings.minimum_refresh_interval_minutes
-        )
+        auto_reload: bool = getattr(self._twitch.settings, "auto_reload_campaigns", True)
+        if auto_reload:
+            interval = getattr(
+                self._twitch.settings,
+                "campaign_reload_interval_minutes",
+                self._twitch.settings.minimum_refresh_interval_minutes,
+            )
+            next_period = now + timedelta(minutes=max(1, interval))
+        else:
+            # If periodic reload is disabled, wait indefinitely for campaign triggers
+            next_period = now + timedelta(days=365)
 
         while True:
-            # exit if there's no need to repeat the loop
             now = datetime.now(timezone.utc)
-            if now >= next_period:
+            if auto_reload and now >= next_period:
                 break
 
             next_trigger = next_period
@@ -80,17 +87,18 @@ class MaintenanceService:
                 ),
             )
 
-            await asyncio.sleep((next_trigger - now).total_seconds())
+            await asyncio.sleep(max(0.1, (next_trigger - now).total_seconds()))
 
             # exit after waiting, before the actions
             now = datetime.now(timezone.utc)
-            if now >= next_period:
+            if auto_reload and now >= next_period:
                 break
 
             if next_trigger != next_period:
                 logger.log(CALL, "Maintenance task requests channels cleanup")
                 self._twitch.change_state(State.CHANNELS_CLEANUP)
 
-        # this triggers a restart of this task every (up to) <timedelta> minutes
-        logger.log(CALL, "Maintenance task requests a reload")
-        self._twitch.request_inventory_refresh()
+        if auto_reload:
+            # this triggers a restart of this task every <campaign_reload_interval_minutes> minutes
+            logger.log(CALL, "Maintenance task requests a reload")
+            self._twitch.request_inventory_refresh()

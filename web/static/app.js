@@ -1188,6 +1188,34 @@ function updateSettingsUI(settings) {
     document.getElementById('connection-quality').value = settings.connection_quality || 1;
     document.getElementById('minimum-refresh-interval').value = settings.minimum_refresh_interval_minutes || 30;
 
+    if (document.getElementById('auto-reload-campaigns')) {
+        document.getElementById('auto-reload-campaigns').checked = settings.auto_reload_campaigns !== false;
+    }
+    if (document.getElementById('campaign-reload-interval')) {
+        document.getElementById('campaign-reload-interval').value = settings.campaign_reload_interval_minutes || 60;
+    }
+    if (document.getElementById('auto-add-new-games')) {
+        document.getElementById('auto-add-new-games').checked = settings.auto_add_new_games !== false;
+    }
+    if (document.getElementById('randomize-behavior')) {
+        document.getElementById('randomize-behavior').checked = settings.randomize_behavior !== false;
+    }
+    if (document.getElementById('random-jitter-seconds')) {
+        document.getElementById('random-jitter-seconds').value = settings.random_jitter_seconds !== undefined ? settings.random_jitter_seconds : 5;
+    }
+    if (document.getElementById('random-switch-delay')) {
+        document.getElementById('random-switch-delay').value = settings.random_switch_delay !== undefined ? settings.random_switch_delay : 10;
+    }
+    if (document.getElementById('random-breaks-enabled')) {
+        document.getElementById('random-breaks-enabled').checked = settings.random_breaks_enabled || false;
+    }
+    if (document.getElementById('random-break-interval-hours')) {
+        document.getElementById('random-break-interval-hours').value = settings.random_break_interval_hours || 3;
+    }
+    if (document.getElementById('random-break-duration-minutes')) {
+        document.getElementById('random-break-duration-minutes').value = settings.random_break_duration_minutes || 5;
+    }
+
     const dropBlacklist = document.getElementById('drop-name-blacklist');
     if (dropBlacklist) {
         dropBlacklist.value = Array.isArray(settings.drop_name_blacklist)
@@ -1893,6 +1921,15 @@ async function saveSettings() {
             document.getElementById('drop-name-blacklist')?.value
         ),
         inventory_filters: getInventoryFilters(),
+        auto_reload_campaigns: document.getElementById('auto-reload-campaigns') ? document.getElementById('auto-reload-campaigns').checked : true,
+        campaign_reload_interval_minutes: parseInt(document.getElementById('campaign-reload-interval')?.value) || 60,
+        auto_add_new_games: document.getElementById('auto-add-new-games') ? document.getElementById('auto-add-new-games').checked : true,
+        randomize_behavior: document.getElementById('randomize-behavior') ? document.getElementById('randomize-behavior').checked : true,
+        random_jitter_seconds: parseInt(document.getElementById('random-jitter-seconds')?.value) || 0,
+        random_switch_delay: parseInt(document.getElementById('random-switch-delay')?.value) || 0,
+        random_breaks_enabled: document.getElementById('random-breaks-enabled') ? document.getElementById('random-breaks-enabled').checked : false,
+        random_break_interval_hours: parseInt(document.getElementById('random-break-interval-hours')?.value) || 3,
+        random_break_duration_minutes: parseInt(document.getElementById('random-break-duration-minutes')?.value) || 5,
         mining_benefits: {
             "DIRECT_ENTITLEMENT": document.getElementById('mining-benefit-item')?.checked,
             "BADGE": document.getElementById('mining-benefit-badge')?.checked,
@@ -2480,6 +2517,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('language').addEventListener('change', saveSettings);
     document.getElementById('connection-quality').addEventListener('change', saveSettings);
     document.getElementById('minimum-refresh-interval').addEventListener('change', saveSettings);
+    document.getElementById('auto-reload-campaigns')?.addEventListener('change', saveSettings);
+    document.getElementById('campaign-reload-interval')?.addEventListener('change', saveSettings);
+    document.getElementById('auto-add-new-games')?.addEventListener('change', saveSettings);
+    document.getElementById('randomize-behavior')?.addEventListener('change', saveSettings);
+    document.getElementById('random-jitter-seconds')?.addEventListener('change', saveSettings);
+    document.getElementById('random-switch-delay')?.addEventListener('change', saveSettings);
+    document.getElementById('random-breaks-enabled')?.addEventListener('change', saveSettings);
+    document.getElementById('random-break-interval-hours')?.addEventListener('change', saveSettings);
+    document.getElementById('random-break-duration-minutes')?.addEventListener('change', saveSettings);
     document.getElementById('drop-name-blacklist').addEventListener('change', saveSettings);
     // Proxy uses a manual "Set Proxy" button instead of auto-save
     document.getElementById('set-proxy-btn').addEventListener('click', () => {

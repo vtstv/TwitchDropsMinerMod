@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from contextlib import suppress
 from time import time
 from typing import TYPE_CHECKING, NoReturn
@@ -49,6 +50,7 @@ class WatchService:
             twitch: The Twitch client instance
         """
         self._twitch = twitch
+        self._last_break_time: float = time()
 
     def can_watch(self, channel: Channel) -> bool:
         """
@@ -201,6 +203,34 @@ class WatchService:
                 self.stop_watching()
                 continue
 
+            # Check for periodic human-like break if enabled
+            if getattr(self._twitch.settings, "random_breaks_enabled", False):
+                now = time()
+                break_interval_hours = float(
+                    getattr(self._twitch.settings, "random_break_interval_hours", 3)
+                )
+                if now - self._last_break_time >= break_interval_hours * 3600:
+                    break_duration_min = max(
+                        1,
+                        int(
+                            getattr(
+                                self._twitch.settings,
+                                "random_break_duration_minutes",
+                                5,
+                            )
+                        ),
+                    )
+                    break_msg = f"☕ Taking a break for {break_duration_min} minute(s) (anti-bot simulation)..."
+                    logger.info(break_msg)
+                    self._twitch.print(break_msg)
+                    self._twitch.gui.progress.stop_timer()
+                    await self.watch_sleep(break_duration_min * 60)
+                    self._last_break_time = time()
+                    resume_msg = "Resuming mining after break."
+                    logger.info(resume_msg)
+                    self._twitch.print(resume_msg)
+                    continue
+
             # logger.log(CALL, f"Sending watch payload to: {channel.name}")
             succeeded: bool = await channel.send_watch()
             last_sent: float = time()
@@ -260,4 +290,10 @@ class WatchService:
                     else:
                         logger.log(CALL, "No active drop could be determined")
 
-            await self.watch_sleep(interval - min(time() - last_sent, interval))
+            sleep_time = interval - min(time() - last_sent, interval)
+            if getattr(self._twitch.settings, "randomize_behavior", False):
+                jitter = float(getattr(self._twitch.settings, "random_jitter_seconds", 0))
+                if jitter > 0:
+                    sleep_time = max(1.0, sleep_time + random.uniform(-jitter, jitter))
+
+            await self.watch_sleep(sleep_time)

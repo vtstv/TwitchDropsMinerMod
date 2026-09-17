@@ -14,11 +14,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
 
 from src.config.paths import DATA_DIR
 from src.version import __version__
 from src.web.auth import AuthAPI, AuthMiddleware, AuthSocketServer, WebAuth
-from starlette.middleware.cors import CORSMiddleware
 
 
 if TYPE_CHECKING:
@@ -95,6 +95,15 @@ class SettingsUpdate(BaseModel):
     inventory_filters: dict | None = None
     inventory_list_view: bool | None = None
     mining_benefits: dict[str, bool] | None = None
+    auto_reload_campaigns: bool | None = None
+    campaign_reload_interval_minutes: int | None = None
+    auto_add_new_games: bool | None = None
+    randomize_behavior: bool | None = None
+    random_jitter_seconds: int | None = None
+    random_switch_delay: int | None = None
+    random_breaks_enabled: bool | None = None
+    random_break_interval_hours: int | None = None
+    random_break_duration_minutes: int | None = None
 
 
 class ProxyVerifyRequest(BaseModel):

@@ -193,24 +193,6 @@
         <div id="settings-tab" class="tab-content">
             <div class="settings-container">
                 <section class="settings-section">
-                    <h2 data-auth-text="title">Dashboard password</h2>
-                    <p id="web-auth-state"></p>
-                    <p class="help-text" data-auth-text="help">Protect this dashboard with one password. Changing it signs out other sessions. Disabling protection clears the password.</p>
-                    <form id="web-auth-settings" class="auth-form">
-                        <div id="web-auth-current-row" hidden>
-                            <label for="web-auth-current" data-auth-text="current_password">Current password</label>
-                            <input id="web-auth-current" type="password" autocomplete="current-password" maxlength="1024">
-                        </div>
-                        <label for="web-auth-new" data-auth-text="new_password">New password (at least 8 characters)</label>
-                        <input id="web-auth-new" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required>
-                        <label for="web-auth-confirm" data-auth-text="confirm_password">Confirm new password</label>
-                        <input id="web-auth-confirm" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required>
-                        <button id="web-auth-save" type="submit" data-auth-text="enable" disabled>Enable password protection</button>
-                        <button id="web-auth-disable" class="auth-secondary" type="button" data-auth-text="disable" hidden>Disable protection and clear password</button>
-                        <p id="web-auth-result" role="status" aria-live="polite"></p>
-                    </form>
-                </section>
-                <section class="settings-section">
                     <h2 id="settings-general-header">General</h2>
                     <label>
                         <input type="checkbox" id="dark-mode"> Dark Mode
@@ -319,6 +301,46 @@
                 </section>
 
                 <section class="settings-section">
+                    <h2>Campaign &amp; Game Automation</h2>
+                    <label>
+                        <input type="checkbox" id="auto-reload-campaigns" checked> Periodically reload campaigns
+                    </label>
+                    <label>
+                        Campaign reload interval (minutes):
+                        <input type="number" id="campaign-reload-interval" min="5" max="1440" value="60">
+                    </label>
+                    <label>
+                        <input type="checkbox" id="auto-add-new-games" checked> Automatically add newly discovered games to watch list
+                    </label>
+                </section>
+
+                <section class="settings-section">
+                    <h2>Anti-Bot Simulation &amp; Randomization</h2>
+                    <label>
+                        <input type="checkbox" id="randomize-behavior" checked> Enable randomized behavior
+                    </label>
+                    <label>
+                        Watch interval jitter (&plusmn; seconds):
+                        <input type="number" id="random-jitter-seconds" min="0" max="30" value="5">
+                    </label>
+                    <label>
+                        Channel switch delay (max seconds):
+                        <input type="number" id="random-switch-delay" min="0" max="60" value="10">
+                    </label>
+                    <label>
+                        <input type="checkbox" id="random-breaks-enabled"> Enable periodic human-like breaks
+                    </label>
+                    <label>
+                        Break interval (hours):
+                        <input type="number" id="random-break-interval-hours" min="1" max="24" value="3">
+                    </label>
+                    <label>
+                        Break duration (minutes):
+                        <input type="number" id="random-break-duration-minutes" min="1" max="60" value="5">
+                    </label>
+                </section>
+
+                <section class="settings-section">
                     <h2 id="settings-actions-header">Actions</h2>
                     <div class="settings-actions">
                         <button id="reload-btn" class="action-button" type="button">Reload</button>
@@ -326,6 +348,25 @@
                     </div>
                     <p id="clear-cache-help" class="help-text">Clears local campaign and channel data, keeps
                         your login and settings, then reloads from Twitch.</p>
+                </section>
+
+                <section class="settings-section">
+                    <h2 data-auth-text="title">Dashboard password</h2>
+                    <p id="web-auth-state"></p>
+                    <p class="help-text" data-auth-text="help">Protect this dashboard with one password. Changing it signs out other sessions. Disabling protection clears the password.</p>
+                    <form id="web-auth-settings" class="auth-form">
+                        <div id="web-auth-current-row" hidden>
+                            <label for="web-auth-current" data-auth-text="current_password">Current password</label>
+                            <input id="web-auth-current" type="password" autocomplete="current-password" maxlength="1024">
+                        </div>
+                        <label for="web-auth-new" data-auth-text="new_password">New password (at least 8 characters)</label>
+                        <input id="web-auth-new" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required>
+                        <label for="web-auth-confirm" data-auth-text="confirm_password">Confirm new password</label>
+                        <input id="web-auth-confirm" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required>
+                        <button id="web-auth-save" type="submit" data-auth-text="enable" disabled>Enable password protection</button>
+                        <button id="web-auth-disable" class="auth-secondary" type="button" data-auth-text="disable" hidden>Disable protection and clear password</button>
+                        <p id="web-auth-result" role="status" aria-live="polite"></p>
+                    </form>
                 </section>
             </div>
         </div>

@@ -347,6 +347,27 @@ class Twitch:
                                 await drop.claim()
                 # figure out which games we want based on games_to_watch whitelist
                 self.wanted_games.clear()
+                if getattr(self.settings, "auto_add_new_games", False):
+                    existing_lower = {g.lower() for g in self.settings.games_to_watch}
+                    added_games: list[str] = []
+                    for campaign in self.inventory:
+                        if (
+                            campaign.eligible
+                            and campaign.game
+                            and campaign.game.name
+                            and campaign.game.name.lower() not in existing_lower
+                        ):
+                            self.settings.games_to_watch.append(campaign.game.name)
+                            existing_lower.add(campaign.game.name.lower())
+                            added_games.append(campaign.game.name)
+                    if added_games:
+                        logger.info("Auto-added new games to watch list: %s", added_games)
+                        self.print(
+                            f"🎮 Auto-added {len(added_games)} new game(s) to watch list: {', '.join(added_games)}"
+                        )
+                        self.settings.save()
+                        self.gui.settings.broadcast_settings()
+                        self.gui.set_games({campaign.game for campaign in self.inventory})
                 games_to_watch: list[str] = self.settings.games_to_watch
                 next_hour: datetime = datetime.now(timezone.utc) + timedelta(hours=1)
                 logger.info("games_to_watch: %s", games_to_watch)
@@ -585,6 +606,17 @@ class Twitch:
 
                 if new_watching is not None:
                     # Switch to new channel
+                    if (
+                        watching_channel != new_watching
+                        and getattr(self.settings, "randomize_behavior", False)
+                    ):
+                        switch_delay = float(getattr(self.settings, "random_switch_delay", 0))
+                        if switch_delay > 0:
+                            import random
+
+                            delay_sec = random.uniform(min(2.0, switch_delay), switch_delay)
+                            logger.info("Random delay before switching channel: %.1fs", delay_sec)
+                            await asyncio.sleep(delay_sec)
                     self.watch(new_watching)
                     # Display the active drop for the new channel
                     if (active_campaign := self.get_active_campaign(new_watching)) is not None and (
