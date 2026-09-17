@@ -3,14 +3,14 @@ FROM python:3-alpine
 # Build arguments for metadata
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VERSION="1.2.6-mod"
+ARG VERSION="1.3.0-mod"
 
 # Labels following OCI Image Format Specification
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.authors="Murr (https://github.com/vtstv), rangermix" \
-      org.opencontainers.image.url="https://github.com/vtstv/TwitchDropsMiner" \
-      org.opencontainers.image.documentation="https://github.com/vtstv/TwitchDropsMiner/blob/main/README.md" \
-      org.opencontainers.image.source="https://github.com/vtstv/TwitchDropsMiner" \
+      org.opencontainers.image.url="https://github.com/vtstv/TwitchDropsMinerMod" \
+      org.opencontainers.image.documentation="https://github.com/vtstv/TwitchDropsMinerMod/blob/main/README.md" \
+      org.opencontainers.image.source="https://github.com/vtstv/TwitchDropsMinerMod" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.vendor="Murr" \
