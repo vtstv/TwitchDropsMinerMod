@@ -356,7 +356,8 @@ class Twitch:
                     added_games: list[str] = []
                     for campaign in self.inventory:
                         if (
-                            campaign.game
+                            campaign.can_be_mined
+                            and campaign.game
                             and campaign.game.name
                             and not campaign.expired
                             and campaign.game.name.lower() not in existing_lower
@@ -377,7 +378,7 @@ class Twitch:
                 logger.info("games_to_watch: %s", games_to_watch)
                 logger.info(
                     "inventory has %d eligible campaigns",
-                    sum(1 for c in self.inventory if c.eligible),
+                    sum(1 for c in self.inventory if c.can_be_mined),
                 )
                 logger.debug("inventories: %s", self.inventory)
 
@@ -401,7 +402,7 @@ class Twitch:
                         "No wanted games found! games_to_watch=%s, eligible_campaigns=%d",
                         games_to_watch,
                         sum(
-                            1 for c in self.inventory if c.eligible and c.can_earn_within(next_hour)
+                            1 for c in self.inventory if c.can_be_mined and c.can_earn_within(next_hour)
                         ),
                     )
 
@@ -818,7 +819,7 @@ class Twitch:
 
         game_campaign_map: dict[str, list[tuple[DropsCampaign, list[str]]]] = defaultdict(list)
         for campaign in self.inventory:
-            if campaign.eligible and not campaign.mining_finished:
+            if campaign.can_be_mined and not campaign.mining_finished:
                 logger.info("eligible Campaign: %s - %s", campaign.name, campaign.game.name)
             if campaign.can_earn_within(next_hour):
                 channel_names = []

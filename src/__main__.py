@@ -21,7 +21,7 @@ if __name__ == "__main__":
     from src.core.client import Twitch
     from src.exceptions import CaptchaRequired
     from src.i18n import _
-    from src.version import __version__
+    from src.version import __mod_version__, __version__
 
     logger = logging.getLogger("TwitchDrops")
     if logger.level < logging.INFO:
@@ -60,7 +60,7 @@ if __name__ == "__main__":
             _.set_language(settings.language)
 
         logger.info("=== TwitchDropsMiner Starting ===")
-        logger.info(f"Version: {__version__}")
+        logger.info(f"Version: {__version__} (Mod v{__mod_version__})")
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Platform: {sys.platform}")
         logger.info(f"Proxy: {settings.proxy}")

@@ -164,6 +164,9 @@ class SettingsManager:
             "auto_add_new_games", settings_data.get("auto_add_new_games"), True
         )
         should_trigger_update |= self.check_and_update_setting(
+            "mine_unlinked_campaigns", settings_data.get("mine_unlinked_campaigns"), True
+        )
+        should_trigger_update |= self.check_and_update_setting(
             "randomize_behavior", settings_data.get("randomize_behavior")
         )
         should_trigger_update |= self.check_and_update_setting(

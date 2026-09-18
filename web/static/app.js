@@ -126,6 +126,13 @@ async function fetchAndDisplayVersion() {
             }
         }
 
+        if (data.mod_version) {
+            const modVersionElement = document.getElementById('mod-version');
+            if (modVersionElement) {
+                modVersionElement.textContent = data.mod_version;
+            }
+        }
+
         // Display update notification if available
         if (data.update_available && data.latest_version) {
             const updateIndicator = document.getElementById('footer-update-indicator');
@@ -1197,6 +1204,9 @@ function updateSettingsUI(settings) {
     if (document.getElementById('auto-add-new-games')) {
         document.getElementById('auto-add-new-games').checked = settings.auto_add_new_games !== false;
     }
+    if (document.getElementById('mine-unlinked-campaigns')) {
+        document.getElementById('mine-unlinked-campaigns').checked = settings.mine_unlinked_campaigns === true;
+    }
     if (document.getElementById('randomize-behavior')) {
         document.getElementById('randomize-behavior').checked = settings.randomize_behavior !== false;
     }
@@ -1924,6 +1934,7 @@ async function saveSettings() {
         auto_reload_campaigns: document.getElementById('auto-reload-campaigns') ? document.getElementById('auto-reload-campaigns').checked : true,
         campaign_reload_interval_minutes: parseInt(document.getElementById('campaign-reload-interval')?.value) || 60,
         auto_add_new_games: document.getElementById('auto-add-new-games') ? document.getElementById('auto-add-new-games').checked : true,
+        mine_unlinked_campaigns: document.getElementById('mine-unlinked-campaigns') ? document.getElementById('mine-unlinked-campaigns').checked : false,
         randomize_behavior: document.getElementById('randomize-behavior') ? document.getElementById('randomize-behavior').checked : true,
         random_jitter_seconds: parseInt(document.getElementById('random-jitter-seconds')?.value) || 0,
         random_switch_delay: parseInt(document.getElementById('random-switch-delay')?.value) || 0,
@@ -2520,6 +2531,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('auto-reload-campaigns')?.addEventListener('change', saveSettings);
     document.getElementById('campaign-reload-interval')?.addEventListener('change', saveSettings);
     document.getElementById('auto-add-new-games')?.addEventListener('change', saveSettings);
+    document.getElementById('mine-unlinked-campaigns')?.addEventListener('change', saveSettings);
     document.getElementById('randomize-behavior')?.addEventListener('change', saveSettings);
     document.getElementById('random-jitter-seconds')?.addEventListener('change', saveSettings);
     document.getElementById('random-switch-delay')?.addEventListener('change', saveSettings);

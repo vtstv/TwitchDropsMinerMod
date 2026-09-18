@@ -54,6 +54,7 @@ default_settings = {
     "auto_reload_campaigns": True,
     "campaign_reload_interval_minutes": 60,
     "auto_add_new_games": True,
+    "mine_unlinked_campaigns": False,
     "randomize_behavior": True,
     "random_jitter_seconds": 5,
     "random_switch_delay": 10,
@@ -80,6 +81,7 @@ class Settings:
     auto_reload_campaigns: bool = True
     campaign_reload_interval_minutes: int = 60
     auto_add_new_games: bool = True
+    mine_unlinked_campaigns: bool = False
     randomize_behavior: bool = True
     random_jitter_seconds: int = 5
     random_switch_delay: int = 10

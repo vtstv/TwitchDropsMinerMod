@@ -129,6 +129,13 @@ class DropsCampaign:
     def eligible(self) -> bool:
         return self.linked or self.has_badge_or_emote
 
+    @property
+    def can_be_mined(self) -> bool:
+        """Return whether this campaign is eligible to be mined based on account state and settings."""
+        settings = getattr(self._twitch, "settings", None)
+        mine_unlinked = (getattr(settings, "mine_unlinked_campaigns", False) is True) if settings else False
+        return self.eligible or mine_unlinked
+
     @cached_property
     def has_badge_or_emote(self) -> bool:
         return any(
@@ -206,7 +213,7 @@ class DropsCampaign:
         self, channel: Channel | None = None, ignore_channel_status: bool = False
     ) -> bool:
         return (
-            self.eligible  # account is eligible
+            self.can_be_mined  # account is eligible or mining unlinked campaigns is allowed
             and self.active  # campaign is active (and valid)
             and (
                 channel is None
@@ -258,7 +265,7 @@ class DropsCampaign:
         # Same as can_earn, but doesn't check the channel
         # and uses a future timestamp to see if we can earn this campaign later
         return (
-            self.eligible
+            self.can_be_mined
             and self._valid
             and self.ends_at > datetime.now(timezone.utc)
             and self.starts_at < stamp

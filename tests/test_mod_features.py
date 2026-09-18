@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.config.settings import Settings, default_settings
+from src.models.campaign import DropsCampaign
 from src.models.game import Game
 from src.services.maintenance import MaintenanceService
 from src.services.watch_service import WatchService
@@ -20,6 +21,7 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(settings.auto_reload_campaigns)
             self.assertEqual(settings.campaign_reload_interval_minutes, 60)
             self.assertTrue(settings.auto_add_new_games)
+            self.assertFalse(settings.mine_unlinked_campaigns)
             self.assertTrue(settings.randomize_behavior)
             self.assertEqual(settings.random_jitter_seconds, 5)
             self.assertEqual(settings.random_switch_delay, 10)
@@ -32,6 +34,7 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
             "auto_reload_campaigns": False,
             "campaign_reload_interval_minutes": 120,
             "auto_add_new_games": True,
+            "mine_unlinked_campaigns": True,
             "randomize_behavior": True,
             "random_jitter_seconds": 8,
             "random_switch_delay": 15,
@@ -42,6 +45,7 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         model = SettingsUpdate(**update_data)
         self.assertFalse(model.auto_reload_campaigns)
         self.assertEqual(model.campaign_reload_interval_minutes, 120)
+        self.assertTrue(model.mine_unlinked_campaigns)
         self.assertEqual(model.random_jitter_seconds, 8)
         self.assertEqual(model.random_switch_delay, 15)
         self.assertTrue(model.random_breaks_enabled)
@@ -58,6 +62,7 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         self.assertFalse(result["auto_reload_campaigns"])
         self.assertEqual(result["campaign_reload_interval_minutes"], 120)
+        self.assertTrue(result["mine_unlinked_campaigns"])
         self.assertEqual(result["random_jitter_seconds"], 8)
         self.assertEqual(result["random_switch_delay"], 15)
         self.assertTrue(result["random_breaks_enabled"])
@@ -69,31 +74,42 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         settings = MagicMock(spec=Settings)
         settings.games_to_watch = ["Game A"]
         settings.auto_add_new_games = True
+        settings.mine_unlinked_campaigns = False
         settings.save = MagicMock()
 
         # Mock inventory campaigns
         campaign_a = MagicMock()
+        campaign_a.can_be_mined = True
         campaign_a.expired = False
         campaign_a.game = Game({"id": 1, "name": "Game A"})
 
-        # Game B is not linked, but active - should be added
+        # Game B is linked and active - should be added
         campaign_b = MagicMock()
+        campaign_b.can_be_mined = True
         campaign_b.expired = False
         campaign_b.game = Game({"id": 2, "name": "Game B"})
 
-        # Game C is expired - should NOT be added
+        # Game C is NOT eligible (unlinked account, mine_unlinked=False) - should NOT be added
         campaign_c = MagicMock()
-        campaign_c.expired = True
+        campaign_c.can_be_mined = False
+        campaign_c.expired = False
         campaign_c.game = Game({"id": 3, "name": "Game C"})
 
-        inventory = [campaign_a, campaign_b, campaign_c]
+        # Game D is expired - should NOT be added
+        campaign_d = MagicMock()
+        campaign_d.can_be_mined = True
+        campaign_d.expired = True
+        campaign_d.game = Game({"id": 4, "name": "Game D"})
 
-        # Check behavior of auto_add logic
+        inventory = [campaign_a, campaign_b, campaign_c, campaign_d]
+
+        # Check behavior when mine_unlinked_campaigns is False
         existing_lower = {g.lower() for g in settings.games_to_watch}
         added_games = []
         for campaign in inventory:
             if (
-                campaign.game
+                campaign.can_be_mined
+                and campaign.game
                 and campaign.game.name
                 and not campaign.expired
                 and campaign.game.name.lower() not in existing_lower
@@ -104,7 +120,26 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("Game B", settings.games_to_watch)
         self.assertNotIn("Game C", settings.games_to_watch)
+        self.assertNotIn("Game D", settings.games_to_watch)
         self.assertEqual(added_games, ["Game B"])
+
+        # Now test when mine_unlinked_campaigns is True: Game C's can_be_mined becomes True
+        campaign_c.can_be_mined = True
+        added_games_unlinked = []
+        for campaign in inventory:
+            if (
+                campaign.can_be_mined
+                and campaign.game
+                and campaign.game.name
+                and not campaign.expired
+                and campaign.game.name.lower() not in existing_lower
+            ):
+                settings.games_to_watch.append(campaign.game.name)
+                existing_lower.add(campaign.game.name.lower())
+                added_games_unlinked.append(campaign.game.name)
+
+        self.assertIn("Game C", settings.games_to_watch)
+        self.assertEqual(added_games_unlinked, ["Game C"])
 
     async def test_maintenance_service_reload_interval(self):
         twitch = MagicMock()
@@ -139,3 +174,28 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         )
         service = WatchService(twitch)
         self.assertIsNotNone(service._last_break_time)
+
+    def test_drops_campaign_can_be_mined(self):
+        twitch = MagicMock()
+        twitch.settings = SimpleNamespace(mine_unlinked_campaigns=False)
+
+        campaign_data = {
+            "id": "camp1",
+            "name": "Test Campaign",
+            "game": {"id": 10, "name": "Game X"},
+            "self": {"isAccountConnected": False},
+            "accountLinkURL": "https://example.com/link",
+            "startAt": "2026-09-18T00:00:00Z",
+            "endAt": "2026-09-19T00:00:00Z",
+            "status": "ACTIVE",
+            "allow": {"channels": [], "isEnabled": True},
+            "timeBasedDrops": [],
+        }
+
+        campaign = DropsCampaign(twitch, campaign_data, {})
+        self.assertFalse(campaign.eligible)
+        self.assertFalse(campaign.can_be_mined)
+
+        twitch.settings.mine_unlinked_campaigns = True
+        self.assertFalse(campaign.eligible)
+        self.assertTrue(campaign.can_be_mined)

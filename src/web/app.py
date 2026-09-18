@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 
 from src.config.paths import DATA_DIR
-from src.version import __version__
+from src.version import __mod_version__, __version__
 from src.web.auth import AuthAPI, AuthMiddleware, AuthSocketServer, WebAuth
 
 
@@ -98,6 +98,7 @@ class SettingsUpdate(BaseModel):
     auto_reload_campaigns: bool | None = None
     campaign_reload_interval_minutes: int | None = None
     auto_add_new_games: bool | None = None
+    mine_unlinked_campaigns: bool | None = None
     randomize_behavior: bool | None = None
     random_jitter_seconds: int | None = None
     random_switch_delay: int | None = None
@@ -128,7 +129,11 @@ async def serve_index():
         f"Looking for web files: __file__={__file__}, web_dir={web_dir}, index_file={index_file}, exists={index_file.exists()}"
     )
     if index_file.exists():
-        content = index_file.read_text(encoding="utf-8").replace("__APP_VERSION__", __version__)
+        content = (
+            index_file.read_text(encoding="utf-8")
+            .replace("__APP_VERSION__", __version__)
+            .replace("__MOD_VERSION__", __mod_version__)
+        )
         return HTMLResponse(content=content, headers={"Cache-Control": "no-cache"})
     return HTMLResponse(
         content=f"<h1>Twitch Drops Miner</h1><p>Web interface files not found. Please check installation.</p><p>Debug: Looking for {index_file}</p>",
@@ -372,7 +377,7 @@ async def get_version():
     """Get current application version and check for updates"""
     import aiohttp
 
-    from src.version import __version__
+    from src.version import __mod_version__, __version__
 
     current_version = __version__
     latest_version = None
@@ -400,6 +405,7 @@ async def get_version():
 
     return {
         "current_version": current_version,
+        "mod_version": __mod_version__,
         "latest_version": latest_version,
         "update_available": update_available,
         "download_url": download_url or "https://github.com/rangermix/TwitchDropsMiner/releases",
