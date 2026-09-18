@@ -53,12 +53,12 @@ class WebGUIManager:
         self.channels = ChannelListManager(self._broadcaster, self)
         self.inv = InventoryManager(self._broadcaster, ImageCache(self))
         self.login = LoginFormManager(self._broadcaster, self)
-        self.inv = InventoryManager(self._broadcaster, ImageCache(self))
-        self.login = LoginFormManager(self._broadcaster, self)
 
         # Callback to trigger game update when relevant settings change
         def on_settings_change() -> None:
             self._twitch.request_games_update()
+            if hasattr(self._twitch, "restart_maintenance"):
+                self._twitch.restart_maintenance()
 
         self.settings = SettingsManager(
             self._broadcaster, twitch.settings, self.output, on_change=on_settings_change

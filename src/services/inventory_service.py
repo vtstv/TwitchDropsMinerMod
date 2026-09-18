@@ -238,6 +238,8 @@ class InventoryService:
         # NOTE: maintenance task is restarted at the end of each inventory fetch
         if self._twitch._mnt_task is not None and not self._twitch._mnt_task.done():
             self._twitch._mnt_task.cancel()
+        if hasattr(self._twitch._maintenance_service, "record_reload"):
+            self._twitch._maintenance_service.record_reload()
         self._twitch._mnt_task = asyncio.create_task(
             self._twitch._maintenance_service.run_maintenance_task()
         )

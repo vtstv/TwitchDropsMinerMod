@@ -73,15 +73,17 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
 
         # Mock inventory campaigns
         campaign_a = MagicMock()
-        campaign_a.eligible = True
+        campaign_a.expired = False
         campaign_a.game = Game({"id": 1, "name": "Game A"})
 
+        # Game B is not linked, but active - should be added
         campaign_b = MagicMock()
-        campaign_b.eligible = True
+        campaign_b.expired = False
         campaign_b.game = Game({"id": 2, "name": "Game B"})
 
+        # Game C is expired - should NOT be added
         campaign_c = MagicMock()
-        campaign_c.eligible = False  # Not eligible
+        campaign_c.expired = True
         campaign_c.game = Game({"id": 3, "name": "Game C"})
 
         inventory = [campaign_a, campaign_b, campaign_c]
@@ -91,9 +93,9 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         added_games = []
         for campaign in inventory:
             if (
-                campaign.eligible
-                and campaign.game
+                campaign.game
                 and campaign.game.name
+                and not campaign.expired
                 and campaign.game.name.lower() not in existing_lower
             ):
                 settings.games_to_watch.append(campaign.game.name)
@@ -117,12 +119,10 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         twitch.request_inventory_refresh = MagicMock()
 
         service = MaintenanceService(twitch)
-        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with patch.object(service, "_sleep", new_callable=AsyncMock) as mock_sleep:
             mock_sleep.side_effect = [None, asyncio.CancelledError()]
             with contextlib.suppress(asyncio.CancelledError):
                 await service.run_maintenance_task()
-
-
 
             self.assertTrue(mock_sleep.called)
             sleep_duration = mock_sleep.call_args_list[0].args[0]

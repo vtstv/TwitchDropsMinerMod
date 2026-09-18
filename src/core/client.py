@@ -230,6 +230,10 @@ class Twitch:
         self._state_change.set()
         return True
 
+    def restart_maintenance(self) -> None:
+        """Signal the maintenance service to wake up and re-evaluate reload intervals immediately."""
+        self._maintenance_service.restart()
+
     def _activate_pending_inventory_refresh(self) -> None:
         """Prioritize a queued refresh over the next normal state transition."""
         if self._inventory_refresh_pending and self._state is not State.EXIT:
@@ -352,9 +356,9 @@ class Twitch:
                     added_games: list[str] = []
                     for campaign in self.inventory:
                         if (
-                            campaign.eligible
-                            and campaign.game
+                            campaign.game
                             and campaign.game.name
+                            and not campaign.expired
                             and campaign.game.name.lower() not in existing_lower
                         ):
                             self.settings.games_to_watch.append(campaign.game.name)

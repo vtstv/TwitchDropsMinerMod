@@ -153,11 +153,12 @@ class SettingsManager:
             "mining_benefits", settings_data.get("mining_benefits"), True
         )
         should_trigger_update |= self.check_and_update_setting(
-            "auto_reload_campaigns", settings_data.get("auto_reload_campaigns")
+            "auto_reload_campaigns", settings_data.get("auto_reload_campaigns"), True
         )
         should_trigger_update |= self.check_and_update_setting(
             "campaign_reload_interval_minutes",
             settings_data.get("campaign_reload_interval_minutes"),
+            True,
         )
         should_trigger_update |= self.check_and_update_setting(
             "auto_add_new_games", settings_data.get("auto_add_new_games"), True
