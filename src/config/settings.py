@@ -61,6 +61,7 @@ default_settings = {
     "random_breaks_enabled": False,
     "random_break_interval_hours": 3,
     "random_break_duration_minutes": 5,
+    "all_drops_games": [],
 }
 
 
@@ -88,9 +89,24 @@ class Settings:
     random_breaks_enabled: bool = False
     random_break_interval_hours: int = 3
     random_break_duration_minutes: int = 5
+    all_drops_games: list[str] = None
 
     def __init__(self):
         self.load()
+
+    @staticmethod
+    def normalize_games_list(games: list[str] | None) -> list[str]:
+        if not games:
+            return []
+        seen = set()
+        result = []
+        for g in games:
+            if isinstance(g, str):
+                cleaned = g.strip()
+                if cleaned and cleaned.lower() not in seen:
+                    seen.add(cleaned.lower())
+                    result.append(cleaned)
+        return result
 
     def load(self):
         # TODO: remvoe customized serde in the future
@@ -103,9 +119,15 @@ class Settings:
         self.drop_name_blacklist = DropIgnorePolicy.normalize_keywords(
             self.drop_name_blacklist
         )
+        self.all_drops_games = self.normalize_games_list(
+            getattr(self, "all_drops_games", [])
+        )
 
     def save(self) -> None:
         self.drop_name_blacklist = DropIgnorePolicy.normalize_keywords(
             self.drop_name_blacklist
+        )
+        self.all_drops_games = self.normalize_games_list(
+            getattr(self, "all_drops_games", [])
         )
         json_save(SETTINGS_PATH, vars(self), sort=True)

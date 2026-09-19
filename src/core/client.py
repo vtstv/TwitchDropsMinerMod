@@ -798,18 +798,42 @@ class Twitch:
         Filter campaigns to find wanted games based on settings and benefits.
         """
         wanted_games: list[Game] = []
-        games_to_watch: list[str] = self.settings.games_to_watch
+        games_to_watch: list[str] = list(self.settings.games_to_watch or [])
         mining_benefits: dict[str, bool] = self.settings.mining_benefits
+
+        all_drops_games_raw = getattr(self.settings, "all_drops_games", []) or []
+        all_drops_games_set = {
+            g.strip().lower()
+            for g in all_drops_games_raw
+            if isinstance(g, str) and g.strip()
+        }
+        for g in all_drops_games_raw:
+            if (
+                isinstance(g, str)
+                and g.strip()
+                and not any(w.strip().lower() == g.strip().lower() for w in games_to_watch)
+            ):
+                games_to_watch.append(g.strip())
+
+        all_benefits_enabled: dict[str, bool] = {
+            "BADGE": True,
+            "DIRECT_ENTITLEMENT": True,
+            "EMOTE": True,
+            "UNKNOWN": True,
+        }
 
         for game_name in games_to_watch:
             game_name_lower: str = game_name.lower()
+            is_all_drops = game_name_lower in all_drops_games_set
+            effective_benefits = all_benefits_enabled if is_all_drops else mining_benefits
+
             for campaign in self.inventory:
                 game: Game = campaign.game
                 if (
                     game.name.lower() == game_name_lower
                     and game not in wanted_games
                     and campaign.can_earn_within(next_hour)
-                    and campaign.has_wanted_unclaimed_benefits(mining_benefits)
+                    and campaign.has_wanted_unclaimed_benefits(effective_benefits)
                 ):
                     wanted_games.append(game)
                     break

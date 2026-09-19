@@ -8,7 +8,7 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from src.config.settings import default_settings
+from src.config.settings import Settings, default_settings
 from src.i18n.translator import _
 from src.models.game import Game
 from src.utils import DropIgnorePolicy, merge_json
@@ -185,6 +185,12 @@ class SettingsManager:
         should_trigger_update |= self.check_and_update_setting(
             "random_break_duration_minutes",
             settings_data.get("random_break_duration_minutes"),
+        )
+        all_drops_games = settings_data.get("all_drops_games")
+        if all_drops_games is not None:
+            all_drops_games = Settings.normalize_games_list(all_drops_games)
+        should_trigger_update |= self.check_and_update_setting(
+            "all_drops_games", all_drops_games, True
         )
 
         self._settings.save()

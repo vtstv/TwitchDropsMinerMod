@@ -214,3 +214,127 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         twitch.settings.mine_unlinked_campaigns = True
         self.assertFalse(campaign.eligible)
         self.assertTrue(campaign.can_be_mined)
+
+    async def test_all_drops_games_settings_and_normalization(self):
+        # Test normalization
+        raw_games = ["  World of Warcraft  ", "", "  ", "rust", "RUST", "No Man's Sky  "]
+        normalized = Settings.normalize_games_list(raw_games)
+        self.assertEqual(normalized, ["World of Warcraft", "rust", "No Man's Sky"])
+
+        # Test defaults
+        with patch("src.config.settings.json_load", return_value={}):
+            settings = Settings()
+            self.assertEqual(settings.all_drops_games, [])
+
+        # Test SettingsUpdate model
+        model = SettingsUpdate(all_drops_games=["Rust", "WoW"])
+        self.assertEqual(model.all_drops_games, ["Rust", "WoW"])
+
+        # Test SettingsManager update
+        settings_dict = copy.deepcopy(default_settings)
+        settings_dict["all_drops_games"] = []
+        settings = SimpleNamespace(**settings_dict)
+        settings.save = MagicMock()
+        broadcaster = AsyncMock()
+        manager = SettingsManager(broadcaster, settings, MagicMock())
+
+        result = manager.update_settings({"all_drops_games": ["  Game A ", "Game A", "Game B "]})
+        self.assertEqual(result["all_drops_games"], ["Game A", "Game B"])
+        self.assertEqual(settings.all_drops_games, ["Game A", "Game B"])
+        settings.save.assert_called_once()
+
+    def test_all_drops_games_stream_selector_and_filter_bypass(self):
+        from datetime import datetime, timezone
+
+        from src.core.client import Twitch
+        from src.models.benefit import Benefit
+        from src.services.stream_selector import StreamSelector
+
+        settings = MagicMock(spec=Settings)
+        settings.games_to_watch = ["Game Normal", "Game AllDrops"]
+        settings.mining_benefits = {"DIRECT_ENTITLEMENT": False, "BADGE": True, "EMOTE": True, "UNKNOWN": True}
+        settings.all_drops_games = ["Game AllDrops"]
+
+        item_benefit = Benefit({
+            "benefit": {
+                "id": "b_item",
+                "name": "Cool Sword",
+                "distributionType": "DIRECT_ENTITLEMENT",
+                "imageAssetURL": "https://example.com/item.png",
+            }
+        })
+
+        # Campaign for Game Normal (only has item drop)
+        camp_normal = MagicMock(spec=DropsCampaign)
+        camp_normal.id = "c_normal"
+        camp_normal.name = "Normal Campaign"
+        camp_normal.campaign_url = "https://twitch.tv/camp_normal"
+        camp_normal.game = Game({"id": 101, "name": "Game Normal"})
+        camp_normal.can_earn_within.return_value = True
+
+        drop_normal = MagicMock()
+        drop_normal.name = "Normal Drop"
+        drop_normal.is_watch_drop = True
+        drop_normal.is_claimed = False
+        drop_normal.ends_at = datetime.max.replace(tzinfo=timezone.utc)
+        drop_normal.is_mineable = True
+        drop_normal.benefits = [item_benefit]
+        # Real get_wanted_unclaimed_benefits behavior
+        drop_normal.get_wanted_unclaimed_benefits.side_effect = (
+            lambda allowed: [b.name for b in drop_normal.benefits if b.is_wanted(allowed)]
+        )
+        drop_normal.has_wanted_unclaimed_benefits.side_effect = (
+            lambda allowed: len(drop_normal.get_wanted_unclaimed_benefits(allowed)) > 0
+        )
+        camp_normal.drops = [drop_normal]
+        camp_normal.has_wanted_unclaimed_benefits.side_effect = (
+            lambda allowed: any(d.has_wanted_unclaimed_benefits(allowed) for d in camp_normal.drops)
+        )
+
+        # Campaign for Game AllDrops (also only has item drop)
+        camp_all_drops = MagicMock(spec=DropsCampaign)
+        camp_all_drops.id = "c_alldrops"
+        camp_all_drops.name = "AllDrops Campaign"
+        camp_all_drops.campaign_url = "https://twitch.tv/camp_alldrops"
+        camp_all_drops.game = Game({"id": 102, "name": "Game AllDrops"})
+        camp_all_drops.can_earn_within.return_value = True
+
+        drop_all_drops = MagicMock()
+        drop_all_drops.name = "AllDrops Item Drop"
+        drop_all_drops.is_watch_drop = True
+        drop_all_drops.is_claimed = False
+        drop_all_drops.ends_at = datetime.max.replace(tzinfo=timezone.utc)
+        drop_all_drops.is_mineable = True
+        drop_all_drops.benefits = [item_benefit]
+        drop_all_drops.get_wanted_unclaimed_benefits.side_effect = (
+            lambda allowed: [b.name for b in drop_all_drops.benefits if b.is_wanted(allowed)]
+        )
+        drop_all_drops.has_wanted_unclaimed_benefits.side_effect = (
+            lambda allowed: len(drop_all_drops.get_wanted_unclaimed_benefits(allowed)) > 0
+        )
+        camp_all_drops.drops = [drop_all_drops]
+        camp_all_drops.has_wanted_unclaimed_benefits.side_effect = (
+            lambda allowed: any(d.has_wanted_unclaimed_benefits(allowed) for d in camp_all_drops.drops)
+        )
+
+        inventory = [camp_normal, camp_all_drops]
+        selector = StreamSelector()
+        wanted_tree = selector.get_wanted_game_tree(settings, inventory)
+        wanted_games = selector.get_wanted_games(settings, inventory)
+
+        # Game Normal should be excluded because DIRECT_ENTITLEMENT is False globally and not in all_drops_games
+        # Game AllDrops should be INCLUDED because it is in all_drops_games
+        self.assertEqual(len(wanted_games), 1)
+        self.assertEqual(wanted_games[0].name, "Game AllDrops")
+        self.assertEqual(len(wanted_tree), 1)
+        self.assertEqual(wanted_tree[0]["game_name"], "Game AllDrops")
+        self.assertEqual(wanted_tree[0]["campaigns"][0]["drops"][0]["benefits"], ["Cool Sword"])
+
+        # Also test Twitch._filter_wanted_campaigns
+        twitch = MagicMock(spec=Twitch)
+        twitch.settings = settings
+        twitch.inventory = inventory
+        next_hour = datetime.now(timezone.utc)
+        filtered_games = Twitch._filter_wanted_campaigns(twitch, next_hour)
+        self.assertEqual(len(filtered_games), 1)
+        self.assertEqual(filtered_games[0].name, "Game AllDrops")

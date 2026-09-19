@@ -105,6 +105,7 @@ class SettingsUpdate(BaseModel):
     random_breaks_enabled: bool | None = None
     random_break_interval_hours: int | None = None
     random_break_duration_minutes: int | None = None
+    all_drops_games: list[str] | None = None
 
 
 class ProxyVerifyRequest(BaseModel):

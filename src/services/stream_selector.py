@@ -5,6 +5,14 @@ from src.models.campaign import DropsCampaign
 from src.models.game import Game
 
 
+ALL_BENEFITS_ENABLED: dict[str, bool] = {
+    "BADGE": True,
+    "DIRECT_ENTITLEMENT": True,
+    "EMOTE": True,
+    "UNKNOWN": True,
+}
+
+
 class StreamSelector:
     def _get_wanted_game_tree(
         self, settings: Settings, campaigns: list[DropsCampaign]
@@ -14,15 +22,33 @@ class StreamSelector:
         Ignoring 'can earn within' time constraint.
         """
         wanted_games = []
-        games_to_watch = settings.games_to_watch
+        games_to_watch = list(settings.games_to_watch or [])
         mining_benefits = settings.mining_benefits
         now = datetime.now(timezone.utc)
         next_hour = now + timedelta(hours=1)
+
+        all_drops_games_raw = getattr(settings, "all_drops_games", []) or []
+        all_drops_games_set = {
+            g.strip().lower()
+            for g in all_drops_games_raw
+            if isinstance(g, str) and g.strip()
+        }
+
+        # Include games from all_drops_games in effective games_to_watch if not already present
+        for g in all_drops_games_raw:
+            if (
+                isinstance(g, str)
+                and g.strip()
+                and not any(w.strip().lower() == g.strip().lower() for w in games_to_watch)
+            ):
+                games_to_watch.append(g.strip())
 
         for game_name in games_to_watch:
             wanted_campaigns = []
             game_obj = None
             game_name_lower = game_name.lower()
+            is_all_drops = game_name_lower in all_drops_games_set
+            effective_benefits = ALL_BENEFITS_ENABLED if is_all_drops else mining_benefits
 
             # Find all campaigns for this game
             for campaign in campaigns:
@@ -45,7 +71,7 @@ class StreamSelector:
                     ):
                         continue
 
-                    filtered_benefits = drop.get_wanted_unclaimed_benefits(mining_benefits)
+                    filtered_benefits = drop.get_wanted_unclaimed_benefits(effective_benefits)
 
                     if len(filtered_benefits) > 0:
                         wanted_drops.append({"name": drop.name, "benefits": filtered_benefits})

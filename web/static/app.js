@@ -1233,6 +1233,13 @@ function updateSettingsUI(settings) {
             : '';
     }
 
+    const allDropsGames = document.getElementById('all-drops-games');
+    if (allDropsGames) {
+        allDropsGames.value = Array.isArray(settings.all_drops_games)
+            ? settings.all_drops_games.join('\n')
+            : '';
+    }
+
     // Update proxy settings and indicator
     const proxyUrl = settings.proxy || '';
     const proxyInput = document.getElementById('proxy-url');
@@ -1918,6 +1925,13 @@ function parseDropNameBlacklist(value) {
         .filter(Boolean);
 }
 
+function parseAllDropsGames(value) {
+    return String(value || '')
+        .split(/\r?\n/)
+        .map(game => game.trim())
+        .filter(Boolean);
+}
+
 async function saveSettings() {
     const settings = {
         dark_mode: document.getElementById('dark-mode').checked,
@@ -1929,6 +1943,9 @@ async function saveSettings() {
         games_to_watch: state.settings.games_to_watch || [],
         drop_name_blacklist: parseDropNameBlacklist(
             document.getElementById('drop-name-blacklist')?.value
+        ),
+        all_drops_games: parseAllDropsGames(
+            document.getElementById('all-drops-games')?.value
         ),
         inventory_filters: getInventoryFilters(),
         auto_reload_campaigns: document.getElementById('auto-reload-campaigns') ? document.getElementById('auto-reload-campaigns').checked : true,
@@ -2539,6 +2556,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('random-break-interval-hours')?.addEventListener('change', saveSettings);
     document.getElementById('random-break-duration-minutes')?.addEventListener('change', saveSettings);
     document.getElementById('drop-name-blacklist').addEventListener('change', saveSettings);
+    document.getElementById('all-drops-games')?.addEventListener('change', saveSettings);
     // Proxy uses a manual "Set Proxy" button instead of auto-save
     document.getElementById('set-proxy-btn').addEventListener('click', () => {
         const proxyInput = document.getElementById('proxy-url');
