@@ -174,6 +174,21 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         )
         service = WatchService(twitch)
         self.assertIsNotNone(service._last_break_time)
+        old_time = service._last_break_time - 100
+        service._last_break_time = old_time
+        service.reset_break_timer()
+        self.assertGreater(service._last_break_time, old_time)
+
+    def test_resume_mining_resets_break_timer(self):
+        from src.core.client import Twitch
+        twitch = MagicMock(spec=Twitch)
+        twitch.mining_enabled = False
+        twitch._watch_service = MagicMock()
+        twitch.gui = MagicMock()
+        Twitch.resume_mining(twitch)
+        self.assertTrue(twitch.mining_enabled)
+        twitch._watch_service.reset_break_timer.assert_called_once()
+        twitch.gui.status.update.assert_called_with("▶ Resuming mining...")
 
     def test_drops_campaign_can_be_mined(self):
         twitch = MagicMock()

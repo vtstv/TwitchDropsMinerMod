@@ -124,6 +124,8 @@ class Twitch:
         if self.gui:
             self.gui.status.update("▶ Resuming mining...")
             self.gui.broadcast_mining_state(True)
+        if hasattr(self, "_watch_service") and self._watch_service:
+            self._watch_service.reset_break_timer()
         self.request_inventory_refresh()
 
     def toggle_mining(self) -> bool:

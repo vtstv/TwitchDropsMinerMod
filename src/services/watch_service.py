@@ -52,6 +52,10 @@ class WatchService:
         self._twitch = twitch
         self._last_break_time: float = time()
 
+    def reset_break_timer(self) -> None:
+        """Reset the anti-bot break timer to the current time."""
+        self._last_break_time = time()
+
     def can_watch(self, channel: Channel) -> bool:
         """
         Determines if the given channel qualifies as a watching candidate.
@@ -127,6 +131,8 @@ class WatchService:
             channel: The channel to start watching
             update_status: Whether to print status message and update status bar
         """
+        if self._twitch.watching_channel.get_with_default(None) is None:
+            self.reset_break_timer()
         self._twitch.gui.channels.set_watching(channel)
         self._twitch.watching_channel.set(channel)
 
@@ -223,12 +229,22 @@ class WatchService:
                     break_msg = f"☕ Taking a break for {break_duration_min} minute(s) (anti-bot simulation)..."
                     logger.info(break_msg)
                     self._twitch.print(break_msg)
+                    self._twitch.gui.status.update(f"☕ Break for {break_duration_min}m (anti-bot)")
                     self._twitch.gui.progress.stop_timer()
                     await self.watch_sleep(break_duration_min * 60)
                     self._last_break_time = time()
                     resume_msg = "Resuming mining after break."
                     logger.info(resume_msg)
                     self._twitch.print(resume_msg)
+                    if self._twitch.is_manual_mode() and self._twitch._manual_target_game:
+                        status_text = f"🎯 Manual Mode: Watching {channel.name} for {self._twitch._manual_target_game.name}"
+                    else:
+                        status_text = _.t["status"]["watching"].format(channel=channel.name)
+                    self._twitch.gui.status.update(status_text)
+                    if (active_campaign := self._twitch.get_active_campaign(channel)) is not None and (
+                        active_drop := active_campaign.first_drop
+                    ) is not None:
+                        active_drop.display(countdown=False, subone=True)
                     continue
 
             # logger.log(CALL, f"Sending watch payload to: {channel.name}")
