@@ -1233,12 +1233,9 @@ function updateSettingsUI(settings) {
             : '';
     }
 
-    const allDropsGames = document.getElementById('all-drops-games');
-    if (allDropsGames) {
-        allDropsGames.value = Array.isArray(settings.all_drops_games)
-            ? settings.all_drops_games.join('\n')
-            : '';
-    }
+    state.settings.all_drops_games = Array.isArray(settings.all_drops_games)
+        ? [...settings.all_drops_games]
+        : [];
 
     // Update proxy settings and indicator
     const proxyUrl = settings.proxy || '';
@@ -1314,6 +1311,7 @@ function updateSettingsUI(settings) {
 
     // Update games to watch lists
     renderGamesToWatch();
+    renderAllDropsGames();
 
     // Re-render channels list to apply filter based on updated games to watch
     renderChannels();
@@ -1362,6 +1360,7 @@ let draggedElement = null;
 socket.on('games_available', (data) => {
     availableGames = new Set(data.games || []);
     renderGamesToWatch();
+    renderAllDropsGames();
 });
 
 function renderGamesToWatch() {
@@ -1516,21 +1515,22 @@ function handleDrop(e) {
 function handleDragEnd(e) {
     e.target.classList.remove('dragging');
 
-    // Update the order in state
-    const container = document.getElementById('selected-games-list');
+    const container = e.target.closest('.sortable-list');
+    if (!container) return;
+
     const items = container.querySelectorAll('.sortable-item');
     const newOrder = Array.from(items).map(item => item.dataset.game);
 
-    state.settings.games_to_watch = newOrder;
-
-    // Re-render to update priority numbers
-    renderSelectedGames(newOrder);
-
-    // Re-render channels list to apply updated filter
-    renderChannels();
-
-    // Save settings
-    saveSettings();
+    if (container.id === 'selected-games-list') {
+        state.settings.games_to_watch = newOrder;
+        renderSelectedGames(newOrder);
+        renderChannels();
+        saveSettings();
+    } else if (container.id === 'all-drops-selected-games-list') {
+        state.settings.all_drops_games = newOrder;
+        renderSelectedAllDropsGames(newOrder);
+        saveSettings();
+    }
 }
 
 function toggleGameWatch(gameName, checked) {
@@ -1676,6 +1676,245 @@ function addGameFromSearch() {
         const t = state.translations;
         let msg = t.gui?.settings?.manual_game_warning || '\"{game}\" is not in the available campaign list. Add it to Games to Watch anyway?';
         msg = msg.replace('{game}', gameToAdd);
+        showConfirmModal(msg, () => finishAdding(gameToAdd));
+    } else {
+        finishAdding(gameToAdd);
+    }
+}
+
+// ==================== All-Drops Games Management ====================
+
+function renderAllDropsGames() {
+    const selectedGames = state.settings.all_drops_games || [];
+    const filterText = document.getElementById('all-drops-games-filter')?.value.toLowerCase() || '';
+
+    // Render selected games (sortable)
+    renderSelectedAllDropsGames(selectedGames);
+
+    // Combine availableGames and games_to_watch into available pool
+    const allAvailable = new Set(availableGames);
+    (state.settings.games_to_watch || []).forEach(game => allAvailable.add(game));
+
+    // Render available games (checkboxes for unselected games)
+    const unselectedGames = Array.from(allAvailable)
+        .filter(game => !selectedGames.some(s => s.toLowerCase() === game.toLowerCase()))
+        .filter(game => game.toLowerCase().includes(filterText))
+        .sort((a, b) => a.localeCompare(b));
+
+    renderAvailableAllDropsGames(unselectedGames, filterText);
+}
+
+function renderSelectedAllDropsGames(games) {
+    const container = document.getElementById('all-drops-selected-games-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (games.length === 0) {
+        const emptyMsg = 'No all-drops games selected. Check games on the right to add them.';
+        container.replaceChildren(makeElement('p', { class: 'empty-message' }, emptyMsg));
+        return;
+    }
+
+    games.forEach((game, index) => {
+        const div = document.createElement('div');
+        div.className = 'sortable-item';
+        div.draggable = true;
+        div.dataset.game = game;
+
+        const priorityInput = makeElement('input', {
+            type: 'number',
+            class: 'priority-input',
+            value: String(index + 1),
+            min: '1',
+            max: String(games.length),
+            'aria-label': `Priority for ${game}`
+        });
+
+        div.replaceChildren(
+            makeElement('span', { class: 'drag-handle' }, '☰'),
+            priorityInput,
+            makeElement('span', { class: 'game-name' }, game),
+            makeElement('button', {
+                class: 'remove-btn',
+                title: `Remove ${game}`,
+                'aria-label': `Remove ${game}`
+            }, '✕')
+        );
+
+        priorityInput.addEventListener('change', (e) => {
+            const priority = Number(e.target.value);
+            if (e.target.value.trim() && Number.isInteger(priority)) {
+                changeAllDropsGamePriority(game, priority - 1);
+            } else {
+                e.target.value = String(index + 1);
+            }
+        });
+
+        const removeBtn = div.querySelector('.remove-btn');
+        removeBtn.addEventListener('click', () => removeGameFromAllDrops(game));
+
+        div.addEventListener('dragstart', handleDragStart);
+        div.addEventListener('dragover', handleDragOver);
+        div.addEventListener('drop', handleDrop);
+        div.addEventListener('dragend', handleDragEnd);
+
+        container.appendChild(div);
+    });
+}
+
+function renderAvailableAllDropsGames(games, filterText) {
+    const container = document.getElementById('all-drops-available-games-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (games.length === 0) {
+        if (filterText) {
+            const emptyMsg = 'No games match your search. Click "Add Game" to add it manually.';
+            container.replaceChildren(makeElement('p', { class: 'empty-message' }, emptyMsg));
+        } else {
+            const emptyMsg = 'All games are selected or no games available.';
+            container.replaceChildren(makeElement('p', { class: 'empty-message' }, emptyMsg));
+        }
+        return;
+    }
+
+    games.forEach(game => {
+        const label = document.createElement('label');
+        label.className = 'game-checkbox';
+        label.replaceChildren(
+            makeElement('input', { type: 'checkbox', value: game }),
+            makeElement('span', {}, game),
+        );
+
+        const checkbox = label.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener('change', (e) => toggleAllDropsGame(game, e.target.checked));
+
+        container.appendChild(label);
+    });
+}
+
+function toggleAllDropsGame(gameName, checked) {
+    const games = state.settings.all_drops_games || [];
+
+    if (checked && !games.some(g => g.toLowerCase() === gameName.toLowerCase())) {
+        games.push(gameName);
+    } else if (!checked) {
+        const index = games.findIndex(g => g.toLowerCase() === gameName.toLowerCase());
+        if (index > -1) {
+            games.splice(index, 1);
+        }
+    }
+
+    state.settings.all_drops_games = games;
+    renderAllDropsGames();
+    saveSettings();
+}
+
+function changeAllDropsGamePriority(gameName, newIndex) {
+    if (!Number.isInteger(newIndex)) return;
+    const games = [...(state.settings.all_drops_games || [])];
+    const currentIndex = games.findIndex(g => g.toLowerCase() === gameName.toLowerCase());
+
+    if (currentIndex > -1) {
+        const [removed] = games.splice(currentIndex, 1);
+        newIndex = Math.max(0, Math.min(newIndex, games.length));
+        games.splice(newIndex, 0, removed);
+
+        state.settings.all_drops_games = games;
+        renderAllDropsGames();
+        saveSettings();
+    }
+}
+
+function removeGameFromAllDrops(gameName) {
+    const games = state.settings.all_drops_games || [];
+    const index = games.findIndex(g => g.toLowerCase() === gameName.toLowerCase());
+    if (index > -1) {
+        games.splice(index, 1);
+        state.settings.all_drops_games = games;
+        renderAllDropsGames();
+        saveSettings();
+    }
+}
+
+function selectAllAllDropsGames() {
+    const existing = state.settings.all_drops_games || [];
+    const selected = new Set(existing.map(game => game.toLowerCase()));
+    const allAvailable = new Set(availableGames);
+    (state.settings.games_to_watch || []).forEach(game => allAvailable.add(game));
+
+    const newGames = Array.from(allAvailable).sort((a, b) => a.localeCompare(b)).filter(game => {
+        const key = game.toLowerCase();
+        if (selected.has(key)) return false;
+        selected.add(key);
+        return true;
+    });
+
+    state.settings.all_drops_games = [...existing, ...newGames];
+    renderAllDropsGames();
+    saveSettings();
+}
+
+function deselectAllAllDropsGames() {
+    if (!state.settings.all_drops_games || state.settings.all_drops_games.length === 0) {
+        return;
+    }
+    showConfirmModal('Are you sure you want to remove all games from the All-Drops list?', () => {
+        state.settings.all_drops_games = [];
+        renderAllDropsGames();
+        saveSettings();
+    });
+}
+
+function addAllDropsGameFromSearch() {
+    const searchInput = document.getElementById('all-drops-games-filter');
+    if (!searchInput) return;
+    const searchLower = searchInput.value.trim().toLowerCase();
+
+    if (!searchLower) return;
+
+    let gameToAdd = searchInput.value.trim();
+    let isManualAdd = true;
+
+    const allAvailable = new Set(availableGames);
+    (state.settings.games_to_watch || []).forEach(game => allAvailable.add(game));
+
+    const matches = Array.from(allAvailable).filter(g => g.toLowerCase().includes(searchLower));
+    const exactMatch = matches.find(g => g.toLowerCase() === searchLower);
+
+    if (exactMatch) {
+        gameToAdd = exactMatch;
+        isManualAdd = false;
+    } else if (matches.length === 1) {
+        gameToAdd = matches[0];
+        isManualAdd = false;
+    } else if (matches.length > 1) {
+        showToast('Multiple games found for your search. Please be more specific.', 'warning');
+        return;
+    }
+
+    const games = state.settings.all_drops_games || [];
+    if (games.some(g => g.toLowerCase() === gameToAdd.toLowerCase())) {
+        searchInput.value = '';
+        renderAllDropsGames();
+        return;
+    }
+
+    const finishAdding = (gameName) => {
+        const current = state.settings.all_drops_games || [];
+        if (current.some(g => g.toLowerCase() === gameName.toLowerCase())) return;
+        state.settings.all_drops_games = [...current, gameName];
+        availableGames.add(gameName);
+
+        searchInput.value = '';
+        renderAllDropsGames();
+        saveSettings();
+    };
+
+    if (isManualAdd) {
+        const msg = `"${gameToAdd}" is not in the available games list. Add it to All-Drops Games anyway?`;
         showConfirmModal(msg, () => finishAdding(gameToAdd));
     } else {
         finishAdding(gameToAdd);
@@ -1925,13 +2164,6 @@ function parseDropNameBlacklist(value) {
         .filter(Boolean);
 }
 
-function parseAllDropsGames(value) {
-    return String(value || '')
-        .split(/\r?\n/)
-        .map(game => game.trim())
-        .filter(Boolean);
-}
-
 async function saveSettings() {
     const settings = {
         dark_mode: document.getElementById('dark-mode').checked,
@@ -1941,11 +2173,9 @@ async function saveSettings() {
         minimum_refresh_interval_minutes: parseInt(document.getElementById('minimum-refresh-interval').value),
         proxy: state.settings.proxy || '',
         games_to_watch: state.settings.games_to_watch || [],
+        all_drops_games: state.settings.all_drops_games || [],
         drop_name_blacklist: parseDropNameBlacklist(
             document.getElementById('drop-name-blacklist')?.value
-        ),
-        all_drops_games: parseAllDropsGames(
-            document.getElementById('all-drops-games')?.value
         ),
         inventory_filters: getInventoryFilters(),
         auto_reload_campaigns: document.getElementById('auto-reload-campaigns') ? document.getElementById('auto-reload-campaigns').checked : true,
@@ -2556,7 +2786,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('random-break-interval-hours')?.addEventListener('change', saveSettings);
     document.getElementById('random-break-duration-minutes')?.addEventListener('change', saveSettings);
     document.getElementById('drop-name-blacklist').addEventListener('change', saveSettings);
-    document.getElementById('all-drops-games')?.addEventListener('change', saveSettings);
     // Proxy uses a manual "Set Proxy" button instead of auto-save
     document.getElementById('set-proxy-btn').addEventListener('click', () => {
         const proxyInput = document.getElementById('proxy-url');
@@ -2599,6 +2828,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') {
             e.preventDefault();
             addGameFromSearch();
+        }
+    });
+
+    // All-Drops games management
+    document.getElementById('all-drops-select-all-btn')?.addEventListener('click', selectAllAllDropsGames);
+    document.getElementById('all-drops-deselect-all-btn')?.addEventListener('click', deselectAllAllDropsGames);
+    document.getElementById('all-drops-add-game-btn')?.addEventListener('click', addAllDropsGameFromSearch);
+    document.getElementById('all-drops-games-filter')?.addEventListener('input', renderAllDropsGames);
+    document.getElementById('all-drops-games-filter')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addAllDropsGameFromSearch();
         }
     });
 

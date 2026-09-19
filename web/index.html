@@ -266,8 +266,28 @@
 
                 <section class="settings-section">
                     <h2 id="settings-all-drops-games-header">All-Drops Games</h2>
-                    <p id="settings-all-drops-games-help" class="help-text">Enter one game name per line. For these games, all drop types (including game items) will be mined even if Item is unchecked above.</p>
-                    <textarea id="all-drops-games" rows="4" placeholder="World of Warcraft&#10;Rust&#10;No Man's Sky"></textarea>
+                    <p id="settings-all-drops-games-help" class="help-text">Select games for which all drop types (including game items) will be mined, even if Item is unchecked above.</p>
+
+                    <div class="games-filter">
+                        <input type="text" id="all-drops-games-filter" placeholder="Search games..." />
+                        <div class="filter-actions">
+                            <button id="all-drops-select-all-btn" class="small-btn">Select All</button>
+                            <button id="all-drops-deselect-all-btn" class="small-btn">Deselect All</button>
+                            <button id="all-drops-add-game-btn" class="small-btn">Add Game</button>
+                        </div>
+                    </div>
+
+                    <div class="games-container">
+                        <div class="selected-games">
+                            <h3>Selected All-Drops Games (drag to reorder)</h3>
+                            <div id="all-drops-selected-games-list" class="sortable-list"></div>
+                        </div>
+
+                        <div class="available-games">
+                            <h3>Available Games</h3>
+                            <div id="all-drops-available-games-list" class="checkbox-list"></div>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="settings-section">
