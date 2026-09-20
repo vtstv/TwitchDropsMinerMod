@@ -3,7 +3,7 @@
 An automated, bandwidth-free Twitch drops miner with **Start/Pause controls**, **dual-stack IPv4/IPv6 Docker support**, and **web dashboard authentication**.
 
 <p align="center">
-  <a href="https://github.com/vtstv"><img src="https://img.shields.io/badge/Mod%20v0.6-by%20Murr-blueviolet?style=flat-square&logo=github" alt="Mod v0.6 by Murr"></a>
+  <a href="https://github.com/vtstv/TwitchDropsMinerMod"><img src="https://img.shields.io/badge/Mod%20v0.6-by%20Murr-blueviolet?style=flat-square&logo=github" alt="Mod v0.6 by Murr"></a>
   <a href="https://hub.docker.com/r/vtstv/twitch-drops-miner"><img src="https://img.shields.io/docker/pulls/vtstv/twitch-drops-miner?style=flat-square&color=blue" alt="Docker Pulls"></a>
   <a href="https://github.com/rangermix/TwitchDropsMiner"><img src="https://img.shields.io/badge/Upstream-rangermix-green?style=flat-square" alt="Upstream"></a>
   <a href="https://github.com/vtstv/TwitchDropsMinerMod/blob/main/LICENSE"><img src="https://img.shields.io/github/license/vtstv/TwitchDropsMinerMod?style=flat-square&color=orange" alt="License"></a>
@@ -80,7 +80,7 @@ Open **<http://localhost:8080>**.
 
 ## 📜 Credits
 
-- Mod by [Murr (vtstv)](https://github.com/vtstv)
+- Mod by [Murr (vtstv)](https://github.com/vtstv/TwitchDropsMinerMod)
 - Upstream: [rangermix/TwitchDropsMiner](https://github.com/rangermix/TwitchDropsMiner)
 - Original: [DevilXD/TwitchDropsMiner](https://github.com/DevilXD/TwitchDropsMiner)
 - License: [MIT](LICENSE)
