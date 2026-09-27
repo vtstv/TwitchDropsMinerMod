@@ -26,25 +26,20 @@ ENV PYTHONUNBUFFERED=1 \
 # Set working directory
 WORKDIR /app
 
-# Twitch's SDK issues renewable integrity state in an owned, temporary browser.
-RUN apk add --no-cache chromium
-
-# Copy project metadata and install dependencies
-COPY pyproject.toml .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir .
-
-# Copy application code
-COPY main.py ./
+# Copy application files and metadata in a single layer
+COPY pyproject.toml main.py ./
 COPY src/ ./src/
 COPY lang/ ./lang/
 COPY icons/ ./icons/
 COPY web/ ./web/
 
-# Create data directory for persistent storage
-RUN mkdir -p /app/data && chmod 777 /app/data
-RUN mkdir -p /app/logs && chmod 777 /app/logs
+# Twitch's SDK issues renewable integrity state in an owned, temporary browser.
+# Install chromium, Python dependencies, and prepare runtime directories in a single layer
+# to minimize layer count and disk footprint for environments using the vfs storage driver.
+RUN apk add --no-cache chromium && \
+    pip install --no-cache-dir . && \
+    mkdir -p /app/data /app/logs && \
+    chmod 777 /app/data /app/logs
 
 # Expose web port
 EXPOSE 8080
