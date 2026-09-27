@@ -3,7 +3,7 @@ FROM python:3-alpine
 # Build arguments for metadata
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VERSION="1.3.0-mod"
+ARG VERSION="2.0.1-mod"
 
 # Labels following OCI Image Format Specification
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
