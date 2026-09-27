@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, SupportsInt, cast
 import aiohttp
 from yarl import URL
 
+from src.config.client_info import ClientType
 from src.config.constants import CALL, ONLINE_DELAY, GQLOperation, JsonType, URLType
 from src.config.operations import GQL_OPERATIONS
 from src.exceptions import MinerException, RequestException
@@ -227,7 +228,8 @@ class Channel:
 
     @property
     def url(self) -> URLType:
-        return URLType(f"{self._twitch._client_type.CLIENT_URL}/{self._login}")
+        # Beacon discovery needs the public channel page, not the OAuth client's app shell.
+        return URLType(f"{ClientType.WEB.CLIENT_URL}/{self._login}")
 
     @property
     def iid(self) -> str:
@@ -401,6 +403,8 @@ class Channel:
         """
         if self._pending_stream_up is None:
             self._pending_stream_up = asyncio.create_task(self._online_delay())
+            self._twitch._channel_tasks.add(self._pending_stream_up)
+            self._pending_stream_up.add_done_callback(self._twitch._channel_tasks.discard)
             self.display()
 
     def set_offline(self) -> None:

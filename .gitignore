@@ -32,3 +32,8 @@ artifacts/
 
 # Private credentials and deployment files
 prv/
+.env
+
+# Private development plans, notes, and local verification records
+/.dev-notes/
+

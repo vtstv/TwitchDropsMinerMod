@@ -24,6 +24,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.i18n import _
 from src.version import __version__
+from src.web.origin import DashboardOrigin
 
 
 class PasswordRequest(BaseModel):
@@ -43,7 +44,8 @@ class WebAuth:
     SESSION_SECONDS = 30 * 24 * 60 * 60
     MAX_SESSIONS = 128
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, public_base_url: str = ""):
+        self.origin = DashboardOrigin(public_base_url)
         self.path = path
         self.password_hash = ""
         self.sessions: dict[str, float] = {}
@@ -142,11 +144,11 @@ class WebAuth:
                                 headers={"Cache-Control": "no-store"})
         if token:
             response.set_cookie(self.COOKIE, token, httponly=True, samesite="strict",
-                                secure=request.url.scheme == "https", path="/",
+                                secure=self.origin.secure_cookie(request), path="/",
                                 max_age=self.SESSION_SECONDS if remember else None)
         else:
             response.delete_cookie(self.COOKIE, httponly=True, samesite="strict",
-                                   secure=request.url.scheme == "https", path="/")
+                                   secure=self.origin.secure_cookie(request), path="/")
         return response
 
 
@@ -168,29 +170,31 @@ class AuthMiddleware:
         socket = path.startswith("/socket.io")
         mutation = scope.get("method", "GET") not in ("GET", "HEAD", "OPTIONS")
         origin = connection.headers.get("origin")
-        scheme = "https" if scope["scheme"] in ("https", "wss") else "http"
-        expected_origin = f"{scheme}://{connection.headers.get('host', '')}"
-        unsafe_origin = origin is not None and origin != expected_origin
+        unsafe_origin = origin is not None and origin != self.auth.origin.expected(connection)
         forbidden = (mutation or socket) and (
             unsafe_origin or connection.headers.get("sec-fetch-site") == "cross-site"
             or (mutation and not socket and connection.headers.get("x-tdm-request") != "1")
         )
         if forbidden:
             return await self.reject(scope, receive, send, 403, "forbidden")
-        if path not in self.PUBLIC and not self.auth.allowed(self.auth.token(scope)):
+        helper = scope["type"] == "http" and (path, scope.get("method")) in {
+            ("/api/helper/connect", "POST"), ("/api/helper/session", "POST"), ("/api/helper/result", "GET"),
+        }
+        if path not in self.PUBLIC and not helper and not self.auth.allowed(self.auth.token(scope)):
             if path == "/" and scope["type"] == "http":
                 return await RedirectResponse("/login", status_code=303,
                     headers={"Cache-Control": "no-store"})(scope, receive, send)
             return await self.reject(scope, receive, send, 401, "authentication_required")
         # Bound auth payloads before Pydantic parses them; do not echo submitted secrets.
-        if mutation and path.startswith("/api/auth/"):
+        if mutation and path.startswith(("/api/auth/", "/api/session/", "/api/helper/")):
+            limit = 65536 if path.startswith(("/api/session/", "/api/helper/")) else 16384
             body = b""
             while True:
                 message = await receive()
                 if message["type"] == "http.disconnect":
                     return
                 body += message.get("body", b"")
-                if len(body) > 16384:
+                if len(body) > limit:
                     return await self.reject(scope, receive, send, 413, "invalid_request")
                 if not message.get("more_body"):
                     break

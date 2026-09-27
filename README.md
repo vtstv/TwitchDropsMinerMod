@@ -1,11 +1,11 @@
-# Twitch Drops Miner (Mod v0.6 by Murr)
+# Twitch Drops Miner (Mod v0.7 by Murr)
 
-An automated, bandwidth-free Twitch drops miner with **Start/Pause controls**, **dual-stack IPv4/IPv6 Docker support**, and **web dashboard authentication**.
+An automated, bandwidth-free Twitch drops miner with **Start/Pause controls**, **All-Drops Games Whitelist**, **dual-stack IPv4/IPv6 Docker support**, and **web dashboard authentication**, updated to upstream **v2.0.1** with **login helper & automatic session renewal**.
 
 <p align="center">
-  <a href="https://github.com/vtstv/TwitchDropsMinerMod"><img src="https://img.shields.io/badge/Mod%20v0.6-by%20Murr-blueviolet?style=flat-square&logo=github" alt="Mod v0.6 by Murr"></a>
+  <a href="https://github.com/vtstv/TwitchDropsMinerMod"><img src="https://img.shields.io/badge/Mod%20v0.7-by%20Murr-blueviolet?style=flat-square&logo=github" alt="Mod v0.7 by Murr"></a>
   <a href="https://hub.docker.com/r/vtstv/twitch-drops-miner"><img src="https://img.shields.io/docker/pulls/vtstv/twitch-drops-miner?style=flat-square&color=blue" alt="Docker Pulls"></a>
-  <a href="https://github.com/rangermix/TwitchDropsMiner"><img src="https://img.shields.io/badge/Upstream-rangermix-green?style=flat-square" alt="Upstream"></a>
+  <a href="https://github.com/rangermix/TwitchDropsMiner"><img src="https://img.shields.io/badge/Upstream-v2.0.1-green?style=flat-square" alt="Upstream v2.0.1"></a>
   <a href="https://github.com/vtstv/TwitchDropsMinerMod/blob/main/LICENSE"><img src="https://img.shields.io/github/license/vtstv/TwitchDropsMinerMod?style=flat-square&color=orange" alt="License"></a>
 </p>
 
@@ -16,13 +16,13 @@ An automated, bandwidth-free Twitch drops miner with **Start/Pause controls**, *
 ## ⚡ What's New in this Mod
 
 - **⏸ Pause / Resume Mining**: Start or pause drop mining anytime from the web UI header button or REST API without closing the container.
+- **🎁 All-Drops Games Whitelist**: Interactive two-pane selector to specify games where all drops and in-game items are collected, even when global Direct Entitlement is disabled.
 - **🌐 IPv4 & IPv6 Dual-Stack**: Binds to `::` on Linux/Docker, enabling native IPv6 and IPv4 traffic, host networking (`--network host`), and NAT64 compatibility.
-- **🔐 Dashboard Password Protection**: Protect the web interface and API with a password in **Settings** (salted scrypt hashing, session tokens).
-- **🔑 Headless Twitch OAuth**: Displays the Twitch activation URL and device code directly in terminal / `docker logs` for easy remote VPS setup.
-- **🎁 All-Drops Games Whitelist**: Specify games to collect all drops and in-game items for, even when global Direct Entitlement is disabled.
 - **🔄 Campaign Auto-Reload & Game Discovery**: Periodically reloads active campaigns at configurable intervals, automatically adds newly discovered games to the watch list, and optionally allows mining unlinked campaigns.
 - **🤖 Anti-Bot Behavior Simulation**: Adds human-like watch beacon jitter, channel switch delays, and optional periodic breaks to mimic authentic viewer habits.
 - **📡 Mining Control API**: Simple REST endpoints to automate pausing and resuming mining via scripts or Home Assistant.
+- **🔐 Dashboard Password Protection**: Protect the web interface and API with a password in **Settings** (salted scrypt hashing, session tokens).
+- **🔑 Desktop Login Helper & Autonomous Renewal**: Integrated upstream v2.0.1 helper-based login and server-side session renewal with bundled Chromium.
 
 ---
 
@@ -38,32 +38,35 @@ An automated, bandwidth-free Twitch drops miner with **Start/Pause controls**, *
    ```bash
    docker compose up -d
    ```
-3. Open **<http://localhost:28088>**.
+3. Open **<http://localhost:28088>** (or custom port configured in `docker-compose.yml`).
 4. To stop: `docker compose down`.
 
 ### Linux / Remote VPS (Docker)
-Run with host networking (supports IPv4 and IPv6):
+Run with host networking (supports native IPv4 and IPv6):
 ```bash
 docker run -d \
-  --name twitch-drops-miner \
+  --name twitch-drops-miner --init --stop-timeout 30 --shm-size 256m \
   --network host \
   --restart unless-stopped \
   -v /opt/twitch-drops-miner/data:/app/data \
   -v /opt/twitch-drops-miner/logs:/app/logs \
   vtstv/twitch-drops-miner:latest
 ```
-Open **`http://<server-ip>:8080`**.  
-To retrieve the Twitch login code, run:
-```bash
-docker logs -f twitch-drops-miner
-```
+Open **`http://<server-ip>:8080`**.
 
-### From Source (Python 3.12+)
-```bash
-pip install -e .
-python main.py
-```
-Open **<http://localhost:8080>**.
+---
+
+## 🔑 Sign In (v2.0.1 Helper Login)
+
+**Run the login helper on your desktop or laptop**, even when TDM runs on a headless server.
+
+1. Download the [login helper](docs/authentication.md#download-the-helper) matching your desktop OS (Chrome must be installed).
+2. Enable **Settings → Allow helper connection** in TDM.
+3. Run the helper on your desktop and enter your TDM server URL (e.g., `http://192.168.1.10:8080` or `http://<server-ip>:8080`).
+4. Sign in to Twitch in the Chrome window it opens. The helper automatically transfers the session to your TDM instance.
+5. TDM handles session renewal automatically on the server with its bundled Chromium engine.
+
+*Existing users:* If you have an active session in `data/cookies.jar`, TDM restores it automatically on startup without needing to re-login.
 
 ---
 
@@ -78,32 +81,28 @@ Open **<http://localhost:8080>**.
 
 ---
 
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for issue reporting, development setup,
-pull requests, required unit and regression checks, and independent adversarial review.
-Coding agents must follow the mandatory workflow in [AGENTS.md](./AGENTS.md), also
-available through the `CLAUDE.md` and `GEMINI.md` symlinks. The pull request template
-records validation and review evidence.
-
 ## Contributors
 
-Contributors are credited automatically when their pull requests are merged into `main`.
+<details>
+<summary>People who contributed merged pull requests</summary>
 
 <!-- contributors:start -->
 | Contributor | Merged pull requests |
 | --- | --- |
+| [@3lb0z0](https://github.com/3lb0z0) | [#110](https://github.com/rangermix/TwitchDropsMiner/pull/110) |
 | [@birdhimself](https://github.com/birdhimself) | [#41](https://github.com/rangermix/TwitchDropsMiner/pull/41) |
 | [@capkz](https://github.com/capkz) | [#70](https://github.com/rangermix/TwitchDropsMiner/pull/70) |
 | [@EthanBlazkowicz](https://github.com/EthanBlazkowicz) | [#33](https://github.com/rangermix/TwitchDropsMiner/pull/33) |
 | [@Klages](https://github.com/Klages) | [#94](https://github.com/rangermix/TwitchDropsMiner/pull/94) · [#95](https://github.com/rangermix/TwitchDropsMiner/pull/95) |
 | [@Knight-sys](https://github.com/Knight-sys) | [#3](https://github.com/rangermix/TwitchDropsMiner/pull/3) |
-| [@rangermix](https://github.com/rangermix) | [#1](https://github.com/rangermix/TwitchDropsMiner/pull/1) · [#2](https://github.com/rangermix/TwitchDropsMiner/pull/2) · [#7](https://github.com/rangermix/TwitchDropsMiner/pull/7) · [#8](https://github.com/rangermix/TwitchDropsMiner/pull/8) · [#9](https://github.com/rangermix/TwitchDropsMiner/pull/9) · [#13](https://github.com/rangermix/TwitchDropsMiner/pull/13) · [#20](https://github.com/rangermix/TwitchDropsMiner/pull/20) · [#24](https://github.com/rangermix/TwitchDropsMiner/pull/24) · [#29](https://github.com/rangermix/TwitchDropsMiner/pull/29) · [#32](https://github.com/rangermix/TwitchDropsMiner/pull/32) · [#45](https://github.com/rangermix/TwitchDropsMiner/pull/45) · [#74](https://github.com/rangermix/TwitchDropsMiner/pull/74) · [#79](https://github.com/rangermix/TwitchDropsMiner/pull/79) · [#80](https://github.com/rangermix/TwitchDropsMiner/pull/80) · [#84](https://github.com/rangermix/TwitchDropsMiner/pull/84) · [#86](https://github.com/rangermix/TwitchDropsMiner/pull/86) · [#88](https://github.com/rangermix/TwitchDropsMiner/pull/88) · [#93](https://github.com/rangermix/TwitchDropsMiner/pull/93) · [#89](https://github.com/rangermix/TwitchDropsMiner/pull/89) · [#90](https://github.com/rangermix/TwitchDropsMiner/pull/90) · [#91](https://github.com/rangermix/TwitchDropsMiner/pull/91) · [#92](https://github.com/rangermix/TwitchDropsMiner/pull/92) · [#104](https://github.com/rangermix/TwitchDropsMiner/pull/104) · [#105](https://github.com/rangermix/TwitchDropsMiner/pull/105) |
+| [@rangermix](https://github.com/rangermix) | [#1](https://github.com/rangermix/TwitchDropsMiner/pull/1) · [#2](https://github.com/rangermix/TwitchDropsMiner/pull/2) · [#7](https://github.com/rangermix/TwitchDropsMiner/pull/7) · [#8](https://github.com/rangermix/TwitchDropsMiner/pull/8) · [#9](https://github.com/rangermix/TwitchDropsMiner/pull/9) · [#13](https://github.com/rangermix/TwitchDropsMiner/pull/13) · [#20](https://github.com/rangermix/TwitchDropsMiner/pull/20) · [#24](https://github.com/rangermix/TwitchDropsMiner/pull/24) · [#29](https://github.com/rangermix/TwitchDropsMiner/pull/29) · [#32](https://github.com/rangermix/TwitchDropsMiner/pull/32) · [#45](https://github.com/rangermix/TwitchDropsMiner/pull/45) · [#74](https://github.com/rangermix/TwitchDropsMiner/pull/74) · [#79](https://github.com/rangermix/TwitchDropsMiner/pull/79) · [#80](https://github.com/rangermix/TwitchDropsMiner/pull/80) · [#84](https://github.com/rangermix/TwitchDropsMiner/pull/84) · [#86](https://github.com/rangermix/TwitchDropsMiner/pull/86) · [#88](https://github.com/rangermix/TwitchDropsMiner/pull/88) · [#93](https://github.com/rangermix/TwitchDropsMiner/pull/93) · [#89](https://github.com/rangermix/TwitchDropsMiner/pull/89) · [#90](https://github.com/rangermix/TwitchDropsMiner/pull/90) · [#91](https://github.com/rangermix/TwitchDropsMiner/pull/91) · [#92](https://github.com/rangermix/TwitchDropsMiner/pull/92) · [#104](https://github.com/rangermix/TwitchDropsMiner/pull/104) · [#105](https://github.com/rangermix/TwitchDropsMiner/pull/105) · [#116](https://github.com/rangermix/TwitchDropsMiner/pull/116) · [#119](https://github.com/rangermix/TwitchDropsMiner/pull/119) · [#120](https://github.com/rangermix/TwitchDropsMiner/pull/120) · [#124](https://github.com/rangermix/TwitchDropsMiner/pull/124) · [#125](https://github.com/rangermix/TwitchDropsMiner/pull/125) · [#126](https://github.com/rangermix/TwitchDropsMiner/pull/126) · [#127](https://github.com/rangermix/TwitchDropsMiner/pull/127) · [#131](https://github.com/rangermix/TwitchDropsMiner/pull/131) · [#133](https://github.com/rangermix/TwitchDropsMiner/pull/133) |
 | [@Sean-Destefano](https://github.com/Sean-Destefano) | [#49](https://github.com/rangermix/TwitchDropsMiner/pull/49) |
 | [@SimpliAj](https://github.com/SimpliAj) | [#72](https://github.com/rangermix/TwitchDropsMiner/pull/72) |
 | [@Stein-N](https://github.com/Stein-N) | [#71](https://github.com/rangermix/TwitchDropsMiner/pull/71) |
 | [@vurmil](https://github.com/vurmil) | [#12](https://github.com/rangermix/TwitchDropsMiner/pull/12) · [#17](https://github.com/rangermix/TwitchDropsMiner/pull/17) · [#18](https://github.com/rangermix/TwitchDropsMiner/pull/18) · [#100](https://github.com/rangermix/TwitchDropsMiner/pull/100) |
 <!-- contributors:end -->
+
+</details>
 
 ## 📜 Credits
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,12 +14,14 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictBool
 from starlette.middleware.cors import CORSMiddleware
+
 
 from src.config.paths import DATA_DIR
 from src.version import __mod_version__, __version__
 from src.web.auth import AuthAPI, AuthMiddleware, AuthSocketServer, WebAuth
+from src.web.session_api import SessionAPI
 
 
 if TYPE_CHECKING:
@@ -33,7 +36,7 @@ logger = logging.getLogger("TwitchDrops")
 # Create FastAPI app
 app = FastAPI(title="Twitch Drops Miner Web", version=__version__)
 
-web_auth = WebAuth(DATA_DIR / "web_auth.json")
+web_auth = WebAuth(DATA_DIR / "web_auth.json", public_base_url=os.environ.get("PUBLIC_BASE_URL", ""))
 sio = AuthSocketServer(web_auth)
 app.include_router(AuthAPI(web_auth, sio).router)
 app.add_middleware(AuthMiddleware, auth=web_auth)
@@ -62,6 +65,8 @@ gui_manager: WebGUIManager | None = None
 twitch_client: Twitch | None = None
 _server_instance: uvicorn.Server | None = None
 
+app.include_router(SessionAPI(web_auth, lambda: twitch_client).router)
+
 
 def set_managers(gui: WebGUIManager, twitch: Twitch):
     """Called by main.py to set up references"""
@@ -72,17 +77,12 @@ def set_managers(gui: WebGUIManager, twitch: Twitch):
 
 
 # Pydantic models for API
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-    token: str = ""
-
-
 class ChannelSelectRequest(BaseModel):
     channel_id: int
 
 
 class SettingsUpdate(BaseModel):
+    allow_helper_connection: StrictBool | None = None
     games_to_watch: list[str] | None = None
     drop_name_blacklist: list[str] | None = None
     dark_mode: bool | None = None
@@ -411,27 +411,6 @@ async def get_version():
         "update_available": update_available,
         "download_url": download_url or "https://github.com/rangermix/TwitchDropsMiner/releases",
     }
-
-
-@app.post("/api/login")
-async def submit_login(login_data: LoginRequest):
-    """Submit login credentials"""
-    if not gui_manager:
-        raise HTTPException(status_code=503, detail="GUI not initialized")
-
-    gui_manager.login.submit_login(login_data.username, login_data.password, login_data.token)
-    return {"success": True}
-
-
-@app.post("/api/oauth/confirm")
-async def confirm_oauth():
-    """Confirm OAuth code has been entered by user"""
-    if not gui_manager:
-        raise HTTPException(status_code=503, detail="GUI not initialized")
-
-    # Just set the event to signal the user has acknowledged the code
-    gui_manager.login._login_event.set()
-    return {"success": True}
 
 
 @app.post("/api/reload")

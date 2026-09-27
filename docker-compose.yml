@@ -3,6 +3,9 @@ services:
     build: .
     image: vtstv/twitch-drops-miner:latest
     container_name: twitch-drops-miner
+    init: true
+    stop_grace_period: 30s
+    shm_size: 256m
     restart: unless-stopped
     ports:
       - "28088:8080"
@@ -12,3 +15,5 @@ services:
     environment:
       - TZ=UTC
       - HOST=0.0.0.0
+      # Optional: exact public URL when using a reverse proxy (root URL, no subpath).
+      # - PUBLIC_BASE_URL=https://drops.example.com
