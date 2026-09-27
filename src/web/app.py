@@ -17,7 +17,6 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, StrictBool
 from starlette.middleware.cors import CORSMiddleware
 
-
 from src.config.paths import DATA_DIR
 from src.version import __mod_version__, __version__
 from src.web.auth import AuthAPI, AuthMiddleware, AuthSocketServer, WebAuth
