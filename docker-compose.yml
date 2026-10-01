@@ -13,6 +13,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
     environment:
+      # Match the timezone of your home internet connection for Twitch browser login.
       - TZ=UTC
       - HOST=0.0.0.0
       # Optional: exact public URL when using a reverse proxy (root URL, no subpath).

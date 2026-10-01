@@ -3,7 +3,7 @@ FROM python:3-alpine
 # Build arguments for metadata
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VERSION="2.0.1-mod"
+ARG VERSION="2.1.0-mod"
 
 # Labels following OCI Image Format Specification
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
@@ -33,13 +33,15 @@ COPY lang/ ./lang/
 COPY icons/ ./icons/
 COPY web/ ./web/
 
-# Twitch's SDK issues renewable integrity state in an owned, temporary browser.
-# Install chromium, Python dependencies, and prepare runtime directories in a single layer
+# Login and renewal use private browsers; only the dashboard port is exposed.
+# Install dependencies, setup tdm-browser user, and prepare runtime directories in a single layer
 # to minimize layer count and disk footprint for environments using the vfs storage driver.
-RUN apk add --no-cache chromium && \
+RUN apk add --no-cache chromium xvfb openbox x11vnc xdotool novnc tzdata && \
+    addgroup -g 10001 -S tdm-browser && \
+    adduser -u 10001 -S -D -H -h /nonexistent -s /sbin/nologin -G tdm-browser tdm-browser && \
     pip install --no-cache-dir . && \
     mkdir -p /app/data /app/logs && \
-    chmod 777 /app/data /app/logs
+    chmod 700 /app/data /app/logs
 
 # Expose web port
 EXPOSE 8080

@@ -1,37 +1,22 @@
 # Installation
 
-Run Twitch Drops Miner on your own computer or headless home server or NAS. Docker
-is the simplest option: the image includes Chromium for automatic session renewal,
-which runs without a desktop or display on the server. Run the separate login helper
-on your desktop or laptop with Google Chrome installed. See
-[which machine runs each part](authentication.md#headless-home-server-or-nas).
-
-## Choose a version
-
-Use the [release notes](https://github.com/rangermix/TwitchDropsMiner/releases) to
-choose a TDM version. Keep TDM and its login helper on the same version.
-
-Version 2.0 introduced helper login and Chromium for server renewal in the Docker
-image. The example below pins patch version 2.0.1 so updates are deliberate.
-
-The `latest` Docker tag is the latest published image; it may predate changes in these
-source guides. Native helper archives are available only on releases that provide
-them. To use an unreleased change, build TDM from the corresponding checkout with
-Compose or run it from source, and use the helper from that same revision. The
-[login guide](authentication.md#download-the-helper) covers matching build artifacts
-when a release does not yet contain helper downloads.
+Run TDM on your own computer or home server with Docker. The published v2.1.0 image
+includes the dashboard's Twitch login browser and automatic session renewal.
+No desktop or display is needed on the server. Older images use their release's
+authentication instructions.
 
 ## Docker
 
-Run this from the directory where you want to keep TDM's data:
+Pull and start the published image:
 
 ```bash
+docker pull rangermix/twitch-drops-miner:2.1.0
 docker run -d \
   --name twitch-drops-miner --init --stop-timeout 30 --shm-size 256m \
-  -p 8080:8080 \
+  -p 8080:8080 -e TZ=Australia/Sydney \
   -v "${PWD}/data:/app/data" \
   --restart unless-stopped \
-  rangermix/twitch-drops-miner:2.0.1
+  rangermix/twitch-drops-miner:2.1.0
 ```
 
 Open [http://localhost:8080](http://localhost:8080). From another computer on your home
@@ -40,6 +25,16 @@ network, use the miner host's LAN address, such as `http://192.168.1.10:8080`.
 The data mount keeps settings and login credentials outside the container. The init
 process and shutdown timeout let TDM close its temporary renewal browser when stopped.
 Only the dashboard port is needed; do not publish a browser or browser-control port.
+
+The data and log mounts must enforce private Linux directory permissions. If your
+host bind mount ignores them, use a Docker named volume, for example
+`-v twitch-drops-miner-data:/app/data` in place of the data bind mount above. Preserve
+that volume when updating. Copy existing data from a private backup while TDM is
+stopped before changing mounts; a new empty volume does not contain the old login
+or settings.
+
+To build a source checkout, run `docker build -t twitch-drops-miner .` from the
+repository root and use `twitch-drops-miner` as the image in the run command above.
 
 To retain file logs outside the container, also mount `./logs:/app/logs`. You can read
 the container's console output with:
@@ -59,8 +54,8 @@ docker compose up -d --build
 
 The supplied configuration stores data in `./data` and logs in `./logs`, exposes port
 8080, and includes the init process and shutdown grace period. It builds the current
-checkout instead of pulling a published image. Adjust its timezone for your home
-server if needed.
+checkout instead of pulling a published image. Set `TZ` to match the timezone of your home internet connection. A mismatch can
+cause Twitch to reject browser login.
 
 Open the dashboard and follow [Twitch login](authentication.md). To protect access
 or use your own reverse proxy, follow [Dashboard access](dashboard-access.md).
@@ -69,11 +64,11 @@ or use your own reverse proxy, follow [Dashboard access](dashboard-access.md).
 
 Install Python 3.12 or newer and [uv](https://docs.astral.sh/uv/). The miner host also
 needs a Chromium executable named `chromium` or `chromium-browser` on its `PATH` for
-automatic renewal. Google Chrome on the helper desktop does not satisfy that server
-requirement when the desktop and miner are different machines.
+automatic renewal.
 
-Run the source miner on Linux or macOS. On Windows, use Docker Desktop with Linux
-containers for the miner; the desktop login helper runs natively on Windows.
+Use Docker for new interactive login. The integrated desktop requires a separate
+unprivileged browser user and private miner data/log permissions; the image configures
+these automatically. Source requirements are listed in the [login guide](authentication.md#dashboard-access-and-source-installations).
 From the repository root:
 
 ```bash
@@ -109,7 +104,6 @@ Review the release notes before updating.
 
 Preserve `data/cookies.jar`. Working Android sessions are reused automatically.
 Smart TV sessions from v1.3.1/v1.3.2, expired sessions, and signed-out installations
-need the [login helper](authentication.md#existing-installations) after updating to
-the helper-based flow. Do not delete all data to solve a login problem.
+use the [dashboard browser](authentication.md#existing-installations). Do not delete all data to solve a login problem.
 
 [All guides](README.md) · [Next: Twitch login](authentication.md)
