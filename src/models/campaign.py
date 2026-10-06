@@ -127,7 +127,11 @@ class DropsCampaign:
 
     @property
     def eligible(self) -> bool:
-        return self.linked or self.has_badge_or_emote
+        return (
+            self.linked
+            or self.has_badge_or_emote
+            or getattr(self._twitch.settings, "allow_unlinked_campaigns", False) is True
+        )
 
     @property
     def can_be_mined(self) -> bool:

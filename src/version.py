@@ -1,2 +1,2 @@
-__version__ = "2.1.1"
-__mod_version__ = "0.9"
+__version__ = "2.2.0"
+__mod_version__ = "0.10"
