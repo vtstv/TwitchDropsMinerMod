@@ -22,6 +22,29 @@
             <button id="twitch-login-retry" type="button" class="action-button" hidden>Retry</button>
         </div>
         <p id="twitch-login-error" role="status" aria-live="polite"></p>
+        <details id="twitch-helper-panel" class="browser-login-access">
+            <summary id="twitch-helper-title">Use desktop helper</summary>
+            <p id="twitch-helper-help"></p>
+            <p id="twitch-helper-downloads"></p>
+            <ul class="browser-helper-downloads">
+                <li><a id="twitch-helper-windows" href="https://github.com/rangermix/TwitchDropsMiner/releases/download/v__APP_VERSION__/tdm-login-helper-__APP_VERSION__-windows-x64.tar.gz">Windows (x64)</a></li>
+                <li><a id="twitch-helper-linux" href="https://github.com/rangermix/TwitchDropsMiner/releases/download/v__APP_VERSION__/tdm-login-helper-__APP_VERSION__-linux-x64.tar.gz">Linux (x64)</a></li>
+                <li><a id="twitch-helper-macos-arm" href="https://github.com/rangermix/TwitchDropsMiner/releases/download/v__APP_VERSION__/tdm-login-helper-__APP_VERSION__-macos-arm64.tar.gz">macOS (Apple silicon)</a></li>
+                <li><a id="twitch-helper-macos-intel" href="https://github.com/rangermix/TwitchDropsMiner/releases/download/v__APP_VERSION__/tdm-login-helper-__APP_VERSION__-macos-x64.tar.gz">macOS (Intel)</a></li>
+            </ul>
+            <p id="twitch-helper-builds-note"></p>
+            <div class="browser-login-actions">
+                <button id="twitch-helper-enable" type="button" class="action-button" disabled>Use desktop helper</button>
+                <button id="twitch-helper-cancel" type="button" class="action-button" hidden>Return to embedded browser</button>
+            </div>
+            <div id="twitch-helper-connection" class="browser-helper-connection" hidden>
+                <p id="twitch-helper-instructions"></p>
+                <label id="twitch-helper-url-label" for="twitch-helper-url"></label>
+                <input id="twitch-helper-url" type="text" readonly autocomplete="off" spellcheck="false">
+                <p id="twitch-helper-access-help"></p>
+            </div>
+            <p id="twitch-helper-status" role="status" aria-live="polite"></p>
+        </details>
         <details class="browser-login-access">
             <summary data-auth-text="title">Dashboard password</summary>
             <div id="twitch-login-access"></div>
@@ -31,65 +54,72 @@
     <div id="dashboard" class="container" hidden>
         <header>
             <div class="header-top">
-                <h1>🎮 Twitch Drops Miner</h1>
+                <h1>
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-3.9 3.1l-1.5 7A2.7 2.7 0 0 0 4 18.3c.8 0 1.5-.4 2-1l1.4-2c.4-.6 1-.9 1.7-.9h5.8c.7 0 1.3.3 1.7.9l1.4 2c.5.6 1.2 1 2 1a2.7 2.7 0 0 0 2.7-3.2l-1.5-7A4 4 0 0 0 17.3 5Z"/></svg>
+                    <span>Twitch Drops Miner</span>
+                </h1>
+                <nav class="tabs">
+                    <button class="tab-button active" data-tab="main">Main</button>
+                    <button class="tab-button" data-tab="inventory">Inventory</button>
+                    <button class="tab-button" data-tab="history">History</button>
+                    <button class="tab-button" data-tab="settings">Settings</button>
+                    <button class="tab-button" data-tab="help">Help</button>
+                </nav>
                 <div class="header-controls">
                     <button id="mining-toggle-btn" class="mining-toggle-btn mining-active" title="Start or pause mining process">
                         <span id="mining-btn-icon">⏸</span>
                         <span id="mining-btn-text">Pause Mining</span>
                     </button>
+                    <div class="header-user">
+                        <span id="user-avatar" class="user-avatar" aria-hidden="true"></span>
+                        <div class="login-panel">
+                            <div id="login-status" class="login-status"></div>
+                            <p id="twitch-renewal-status" class="help-text" role="status" aria-live="polite"></p>
+                        </div>
+                    </div>
+                    <span id="connection-indicator" class="connected">● Connected</span>
                     <button id="web-auth-logout" type="button" data-auth-text="logout" hidden>Log out</button>
                     <span id="web-auth-logout-result" role="status" aria-live="polite"></span>
                     <label for="language" class="language-selector">
-                        <span>Language:</span>
-                        <select id="language">
-                            <option value="en">English</option>
+                        <span class="sr-only">Select language</span>
+                        <select id="language" name="language" aria-label="Language">
+                            <option value="English">English</option>
                         </select>
                     </label>
                 </div>
             </div>
-            <div class="status-bar">
-                <span id="mining-status-badge" class="mode-badge mining-active-badge" title="Mining process status">
-                    ⛏ MINING ACTIVE
-                </span>
-                <span id="status-text">Initializing...</span>
-                <span id="manual-mode-badge" class="mode-badge hidden"
-                    title="Manual mode active - watching specific game">
-                    🎯 MANUAL: <span id="manual-game-name"></span>
-                </span>
-                <span id="auto-mode-badge" class="mode-badge" title="Automatic mode - following game priority">
-                    🤖 AUTO
-                </span>
-                <span id="proxy-indicator" class="proxy-badge" style="display: none;" title="Proxy connection active">
-                    🔒 PROXY
-                </span>
-                <span id="connection-indicator" class="connected">● Connected</span>
-            </div>
         </header>
-
-        <nav class="tabs">
-            <button class="tab-button active" data-tab="main">Main</button>
-            <button class="tab-button" data-tab="inventory">Inventory</button>
-            <button class="tab-button" data-tab="history">History</button>
-            <button class="tab-button" data-tab="settings">Settings</button>
-            <button class="tab-button" data-tab="help">Help</button>
-        </nav>
+        <div class="status-bar">
+            <span id="mining-status-badge" class="mode-badge mining-active-badge" title="Mining process status">
+                ⛏ MINING ACTIVE
+            </span>
+            <span id="status-text">Initializing...</span>
+            <span id="manual-mode-badge" class="mode-badge hidden"
+                title="Manual mode active - watching specific game">
+                🎯 MANUAL: <span id="manual-game-name"></span>
+            </span>
+            <span id="auto-mode-badge" class="mode-badge" title="Automatic mode - following game priority">
+                🤖 AUTO
+            </span>
+            <span id="proxy-indicator" class="proxy-badge" style="display: none;" title="Proxy connection active">
+                🔒 PROXY
+            </span>
+        </div>
 
         <!-- Main Tab -->
         <div id="main-tab" class="tab-content active">
             <div class="main-grid">
-                <!-- Login Section -->
-                <section class="panel login-panel">
-                    <h2>Login</h2>
-                    <div id="login-status" class="login-status"></div>
-                    <p id="twitch-renewal-status" class="help-text" role="status" aria-live="polite"></p>
-                </section>
-
                 <!-- Current Drop Progress -->
                 <section class="panel progress-panel">
                     <h2 id="progress-header">Campaign Progress</h2>
+                    <div class="progress-layout">
                     <div id="progress-container">
                         <div id="no-drop-message">No active drop</div>
                         <div id="drop-info" style="display: none;">
+                            <div id="drop-art" class="drop-art hidden">
+                                <div class="drop-art-bg"></div>
+                                <img class="drop-art-poster" alt="">
+                            </div>
                             <div id="manual-mode-controls" class="manual-mode-controls hidden">
                                 <div class="manual-mode-info">
                                     🎯 Manual Mode: Mining <strong id="manual-mode-game"></strong>
@@ -101,9 +131,22 @@
                             <div class="progress-bar">
                                 <div class="progress-fill" id="progress-fill"></div>
                             </div>
-                            <div class="progress-text" id="progress-text"></div>
-                            <div class="progress-time" id="progress-time"></div>
+                            <div class="progress-meta">
+                                <div class="progress-time" id="progress-time"></div>
+                                <div class="progress-text" id="progress-text"></div>
+                            </div>
                         </div>
+                    </div>
+                    <div id="now-watching" class="now-watching hidden">
+                        <div class="now-watching-head">
+                            <span id="now-watching-title">Now Watching</span>
+                            <span id="now-watching-live" class="live-badge">Online</span>
+                        </div>
+                        <button id="now-watching-toggle" class="secondary-btn" type="button" aria-pressed="false" aria-controls="now-watching-preview">Show thumbnail</button>
+                        <p id="now-watching-off">Thumbnail is off</p>
+                        <div id="now-watching-preview" class="now-watching-preview" hidden><div id="now-watching-img"></div></div>
+                        <div class="now-watching-foot" id="now-watching-info"></div>
+                    </div>
                     </div>
                 </section>
 

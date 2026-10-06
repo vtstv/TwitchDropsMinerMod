@@ -1,9 +1,13 @@
-FROM python:3-alpine
+# Extract only noVNC's browser library, without installing its websockify server.
+FROM alpine:latest AS novnc-assets
+RUN apk add --no-cache novnc
+
+FROM python:alpine
 
 # Build arguments for metadata
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VERSION="2.1.0-mod"
+ARG VERSION="2.1.1-mod"
 
 # Labels following OCI Image Format Specification
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
@@ -26,7 +30,10 @@ ENV PYTHONUNBUFFERED=1 \
 # Set working directory
 WORKDIR /app
 
-# Copy application files and metadata in a single layer
+# Copy noVNC browser library
+COPY --from=novnc-assets /usr/share/novnc/ /usr/share/novnc/
+
+# Copy application files and metadata
 COPY pyproject.toml main.py ./
 COPY src/ ./src/
 COPY lang/ ./lang/
@@ -34,21 +41,21 @@ COPY icons/ ./icons/
 COPY web/ ./web/
 
 # Login and renewal use private browsers; only the dashboard port is exposed.
-# Install dependencies, setup tdm-browser user, and prepare runtime directories in a single layer
-# to minimize layer count and disk footprint for environments using the vfs storage driver.
-RUN apk add --no-cache chromium xvfb openbox x11vnc xdotool novnc tzdata && \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache chromium xvfb openbox x11vnc xdotool tzdata && \
     addgroup -g 10001 -S tdm-browser && \
     adduser -u 10001 -S -D -H -h /nonexistent -s /sbin/nologin -G tdm-browser tdm-browser && \
     pip install --no-cache-dir . && \
+    pip uninstall --yes pip && \
     mkdir -p /app/data /app/logs && \
     chmod 700 /app/data /app/logs
 
 # Expose web port
 EXPOSE 8080
 
-# Health check (uses /health which does not require basic auth)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')" || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://[::1]:8080/healthz')" || exit 1
 
 # Run the application
 CMD ["python", "main.py"]
