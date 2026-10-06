@@ -67,6 +67,9 @@ It is the repository's contribution policy, not optional background reading.
      results in the PR without publishing personal working records.
    - Keep `CLAUDE.md` and `GEMINI.md` as relative symbolic links to `AGENTS.md`; do not replace them with duplicated text. Put any agent-specific instructions in clearly named sections of `AGENTS.md`.
 
+6. **Mod Updates & Upstream Synchronization**:
+   - When the user asks to update, sync with upstream, or says "сделай обновление" / "обнови мод", strictly follow the step-by-step procedure defined in `prv/UPDATE_INSTRUCTIONS.md`.
+
 ## Project Overview
 
 Twitch Drops Miner is a Python application that automatically mines timed Twitch drops without downloading stream data. It uses Twitch's GraphQL API and websocket connections to simulate watching streams while tracking drop progress.
