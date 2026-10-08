@@ -7,7 +7,7 @@ FROM python:alpine
 # Build arguments for metadata
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VERSION="2.2.0-mod"
+ARG VERSION="2.2.1-mod"
 
 # Labels following OCI Image Format Specification
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \

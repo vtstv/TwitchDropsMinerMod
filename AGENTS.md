@@ -21,6 +21,14 @@ It is the repository's contribution policy, not optional background reading.
   or PR. Never claim completion of checks that did not run or approval not received.
 - Do not declare a PR ready to merge while required checks or review are missing or
   blocking findings remain. Document the gap and keep an incomplete PR in draft.
+- When taking on an issue or PR, first post a comment there acknowledging that work
+  is starting and briefly stating the scope, before investigation, implementation,
+  or review. If both an issue and a PR are being worked on, acknowledge both.
+- Before ending or pausing work, update every issue or PR being worked on with the
+  outcome, relevant evidence or validation, and any remaining action or request for
+  information. Post this update for every outcome, including resolved, closed,
+  no change needed, blocked, or more information needed, even when no code changed
+  or the issue or PR remains open.
 
 ## Development Guidelines
 
@@ -427,12 +435,24 @@ progress to an ignored drop while the miner intentionally targets another reward
 
 ### Drop Mining Mechanism
 
-The application sends periodic "watch" payloads through Twitch GraphQL `sendSpadeEvents`:
-
-- Payload contains gzip/base64-encoded minute-watched events with channel/broadcast IDs
-- Twitch reports progress via websocket (User.Drops topic)
-- If websocket updates stop, fallback to GQL CurrentDrop query
-- Extrapolation via "bump minutes" when no updates received
+- `Channel.send_watch()` polls the lowest-bandwidth HLS playlist and sends HEAD requests
+  for every new media segment, without downloading stream audio or video. `WatchService`
+  polls about every ten seconds, within the rolling playlist window.
+- Deduplicate successful segments in a bounded 256-entry cache per channel/broadcast;
+  retain it and the cached playlist URL across same-broadcast metadata refreshes. Reset
+  on a new broadcast; account replacement drains watch tasks and derived channel state.
+  Retry failed segments, refresh expired playlist URLs, and stop stale batches when the
+  selected channel or broadcast changes or goes offline. Bound the entire poll and
+  each request; propagate cancellation and process exit. Never log signed URLs or bodies.
+- Spade minute-watched telemetry remains auxiliary and runs at most once per 59 seconds.
+  Its HTTP 204 response and a Watching label do not prove Twitch has credited progress.
+  Keep fallback CurrentDrop queries and estimated-minute bumps on the existing minute
+  cadence when changing playlist polling, including across restarts/channel events.
+- Twitch reports authoritative progress through User.Drops websocket events and GraphQL
+  Inventory/CurrentDrop. Distinguish those readings from dashboard estimates and mocks.
+  Playlist/transport, lifecycle, and controlled-clock regressions live in
+  `tests/test_playlist_watch.py`, `tests/test_watch_transport.py`, and
+  `tests/test_watch_poll_cadence.py`.
 
 ### GraphQL Operations
 
