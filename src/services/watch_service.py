@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
 from contextlib import suppress
-from time import monotonic
+from time import monotonic, time
 from typing import TYPE_CHECKING, NoReturn
 
 from src.config import CALL, GQL_OPERATIONS, WATCH_INTERVAL
