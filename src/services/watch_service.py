@@ -61,6 +61,7 @@ class WatchService:
 
         A channel can be watched if:
         - The channel is online
+        - Twitch has not reported an active ban for the signed-in account
         - A campaign for a wanted game can be progressed on this channel
         - Drops are enabled, unless the campaign uses a special category
 
@@ -76,7 +77,7 @@ class WatchService:
         if not self._twitch.mining_enabled:
             return False
         wanted_games = self._twitch.wanted_games
-        if not wanted_games or not channel.online:
+        if not wanted_games or not channel.online or channel.banned:
             return False
 
         return any(
@@ -108,8 +109,8 @@ class WatchService:
         if watching_channel is None or not self.can_watch(watching_channel):
             return True
 
-        channel_order = self._twitch._channel_service.get_priority(channel)
-        watching_order = self._twitch._channel_service.get_priority(watching_channel)
+        channel_order = self._twitch._channel_service.get_mining_priority(channel)
+        watching_order = self._twitch._channel_service.get_mining_priority(watching_channel)
 
         return (
             # this channel's game is higher order than the watching one's
@@ -196,7 +197,7 @@ class WatchService:
                 await asyncio.sleep(1)
                 continue
 
-            if not channel.online:
+            if not self._twitch.is_mining_time() or not channel.online or channel.banned:
                 # if the channel isn't online anymore, we stop watching it
                 self.stop_watching()
                 continue

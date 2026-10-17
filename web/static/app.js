@@ -513,10 +513,11 @@ function renderChannels() {
     const gamesToWatch = state.settings.games_to_watch || [];
     const gamesToWatchSet = new Set(gamesToWatch.map(g => g.toLowerCase()));
 
-    // The active channel remains visible while a settings update changes the
-    // game filter; all other channels must match the configured watch list.
+    // Only an explicit opt-in exposes fallback games. Keep the watched channel
+    // visible while a settings update changes the selected-game filter.
     const filteredChannels = channels.filter(
-        channel => channelMatchesGameFilter(channel, gamesToWatchSet)
+        channel => state.settings.priority_list_only === false ||
+            channelMatchesGameFilter(channel, gamesToWatchSet)
     );
 
     if (filteredChannels.length === 0) {
@@ -1225,6 +1226,7 @@ function updateSettingsUI(settings) {
     if (allowUnlinked) allowUnlinked.checked = settings.allow_unlinked_campaigns === true;
     document.getElementById('dark-mode').checked = settings.dark_mode || false;
     document.getElementById('inventory-list-view').checked = settings.inventory_list_view || false;
+    document.getElementById('priority-list-only').checked = settings.priority_list_only !== false;
     applyInventoryViewMode(settings.inventory_list_view || false);
     document.getElementById('connection-quality').value = settings.connection_quality || 1;
     document.getElementById('minimum-refresh-interval').value = settings.minimum_refresh_interval_minutes || 30;
@@ -1260,6 +1262,14 @@ function updateSettingsUI(settings) {
         document.getElementById('random-break-duration-minutes').value = settings.random_break_duration_minutes || 5;
     }
 
+    const miningHours = settings.mining_hours || { mode: 'always', start: '08:00', end: '22:00' };
+    const rangeMode = miningHours.mode === 'range';
+    document.getElementById('mining-hours-always').checked = !rangeMode;
+    document.getElementById('mining-hours-range').checked = rangeMode;
+    document.getElementById('mining-hours-start').value = miningHours.start || '08:00';
+    document.getElementById('mining-hours-end').value = miningHours.end || '22:00';
+    toggleMiningHoursRange(rangeMode);
+
     const dropBlacklist = document.getElementById('drop-name-blacklist');
     if (dropBlacklist) {
         dropBlacklist.value = Array.isArray(settings.drop_name_blacklist)
@@ -1280,6 +1290,13 @@ function updateSettingsUI(settings) {
     if (proxyIndicator) {
         proxyIndicator.style.display = proxyUrl ? 'inline-flex' : 'none';
         proxyIndicator.title = proxyUrl ? `Proxy active: ${proxyUrl}` : 'Proxy disabled';
+    }
+
+    const discordWebhookInput = document.getElementById('discord-webhook-url');
+    if (discordWebhookInput) {
+        discordWebhookInput.value = '';
+        discordWebhookInput.placeholder = settings.discord_configured
+            ? '••••••••' : 'https://discord.com/api/webhooks/ID/TOKEN';
     }
 
     // Populate Telegram fields if present in settings (the server never
@@ -2046,6 +2063,68 @@ async function verifyProxy() {
     }
 }
 
+async function saveDiscordSettings(webhookUrl, removeWebhook = false) {
+    const dc = state.translations.gui?.settings?.discord || {};
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ discord_webhook_url: webhookUrl, discord_remove_webhook: removeWebhook })
+        });
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        if (data.success !== true || !data.settings) throw new Error();
+        updateSettingsUI(data.settings);
+    } catch (error) {
+        throw new Error(dc.save_error || 'Failed to save Discord settings.');
+    }
+}
+
+async function updateDiscordSettings(action) {
+    if (state.discordActionPending) return;
+    const input = document.getElementById('discord-webhook-url');
+    const result = document.getElementById('discord-test-result');
+    if (!result) return;
+    const dc = state.translations.gui?.settings?.discord || {};
+    const webhookUrl = input ? input.value.trim() : '';
+    result.style.display = 'block';
+    if (action !== 'remove' && !webhookUrl && !state.settings.discord_configured) {
+        result.className = 'verify-result error';
+        result.textContent = dc.missing_credentials || 'Please enter a Discord Webhook URL.';
+        return;
+    }
+    state.discordActionPending = true;
+    const controls = ['save-discord-btn', 'test-discord-btn', 'remove-discord-btn', 'discord-webhook-url']
+        .map(id => document.getElementById(id)).filter(Boolean);
+    controls.forEach(control => { control.disabled = true; });
+    result.className = 'verify-result loading';
+    result.textContent = `${action === 'test' ? (dc.test_connection || 'Test Connection') : (dc.save_settings || 'Save Settings')}…`;
+    let saving = false;
+    try {
+        if (action === 'test') {
+            const response = await fetch('/api/settings/test-discord', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ discord_webhook_url: webhookUrl })
+            });
+            if (!response.ok || (await response.json()).success !== true) throw new Error();
+        }
+        saving = true;
+        await saveDiscordSettings(action === 'remove' ? '' : webhookUrl, action === 'remove');
+        result.className = 'verify-result success';
+        result.textContent = action === 'test' ? (dc.success || 'Discord connection successful!')
+            : action === 'remove' ? (dc.removed || 'Webhook removed. Discord notifications are disabled.')
+            : (dc.saved || 'Settings saved successfully!');
+    } catch (error) {
+        result.className = 'verify-result error';
+        result.textContent = saving ? (dc.save_error || 'Failed to save Discord settings.')
+            : (dc.error || 'Failed to connect to Discord. Please check your Webhook URL.');
+    } finally {
+        state.discordActionPending = false;
+        controls.forEach(control => { control.disabled = false; });
+    }
+}
+
 async function testTelegramConnection() {
     const botTokenInput = document.getElementById('telegram-bot-token');
     const chatIdInput = document.getElementById('telegram-chat-id');
@@ -2165,6 +2244,56 @@ function parseDropNameBlacklist(value) {
         .filter(Boolean);
 }
 
+function toggleMiningHoursRange(enabled) {
+    const container = document.getElementById('mining-hours-range-inputs');
+    if (container) container.style.display = enabled ? '' : 'none';
+}
+
+async function onMiningHoursChange() {
+    const always = document.getElementById('mining-hours-always');
+    const range = document.getElementById('mining-hours-range');
+    const start = document.getElementById('mining-hours-start');
+    const end = document.getElementById('mining-hours-end');
+    const error = document.getElementById('mining-hours-error');
+    const controls = [always, range, start, end];
+    const previous = state.settings.mining_hours || { mode: 'always', start: '08:00', end: '22:00' };
+    error.hidden = true;
+    error.textContent = '';
+    toggleMiningHoursRange(range.checked);
+    if (range.checked && (!start.reportValidity() || !end.reportValidity())) return;
+    const requested = {
+        mode: range.checked ? 'range' : 'always',
+        start: start.value || previous.start,
+        end: end.value || previous.end
+    };
+    const message = state.translations.gui?.settings?.mining_hours_save_error ||
+        'Could not save mining hours. Please try again.';
+    controls.forEach(control => { control.disabled = true; });
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mining_hours: requested })
+        });
+        if (!response.ok) throw new Error(message);
+        const data = await response.json();
+        const saved = data.settings?.mining_hours;
+        if (data.success !== true || !saved ||
+            ['mode', 'start', 'end'].some(key => saved[key] !== requested[key])) throw new Error(message);
+        updateSettingsUI(data.settings);
+    } catch (failure) {
+        always.checked = previous.mode !== 'range';
+        range.checked = previous.mode === 'range';
+        start.value = previous.start;
+        end.value = previous.end;
+        toggleMiningHoursRange(range.checked);
+        error.textContent = message;
+        error.hidden = false;
+    } finally {
+        controls.forEach(control => { control.disabled = false; });
+    }
+}
+
 async function saveSettings() {
     const settings = {
         dark_mode: document.getElementById('dark-mode').checked,
@@ -2206,6 +2335,32 @@ async function saveSettings() {
         console.log('Settings saved automatically');
     } catch (error) {
         console.error('Failed to save settings:', error);
+    }
+}
+
+async function onPriorityModeChange() {
+    const input = document.getElementById('priority-list-only');
+    if (input.disabled) return;
+    const requested = input.checked;
+    const message = state.translations.gui?.settings?.priority_list_only_save_error ||
+        'Could not save the game priority option. Please try again.';
+    input.disabled = true;
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priority_list_only: requested })
+        });
+        if (!response.ok) throw new Error(message);
+        const data = await response.json();
+        if (data.success !== true || data.settings?.priority_list_only !== requested) throw new Error(message);
+        updateSettingsUI(data.settings);
+    } catch (failure) {
+        input.checked = state.settings.priority_list_only !== false;
+        renderChannels();
+        showToast(message, 'error');
+    } finally {
+        input.disabled = false;
     }
 }
 
@@ -2388,6 +2543,14 @@ function applyTranslations(t) {
             darkModeLabel.appendChild(document.createTextNode(' ' + t.gui.settings.general.dark_mode));
         }
 
+        const priorityListOnlyLabel = settingsTab.querySelector('label:has(#priority-list-only)');
+        if (priorityListOnlyLabel && t.gui.settings.priority_list_only) {
+            const checkbox = priorityListOnlyLabel.querySelector('input');
+            priorityListOnlyLabel.textContent = '';
+            priorityListOnlyLabel.appendChild(checkbox);
+            priorityListOnlyLabel.appendChild(document.createTextNode(' ' + t.gui.settings.priority_list_only));
+        }
+
         const connQualityLabel = settingsTab.querySelector('label:has(#connection-quality)');
         if (connQualityLabel) {
             const input = connQualityLabel.querySelector('input');
@@ -2404,6 +2567,24 @@ function applyTranslations(t) {
 
         const benefitsHelp = document.getElementById('settings-benefits-help');
         if (benefitsHelp && t.gui.settings.mining_benefits_help) benefitsHelp.textContent = t.gui.settings.mining_benefits_help;
+
+        const hoursHeader = document.getElementById('settings-hours-header');
+        if (hoursHeader && t.gui.settings.mining_hours) hoursHeader.textContent = t.gui.settings.mining_hours;
+
+        const hoursHelp = document.getElementById('settings-hours-help');
+        if (hoursHelp && t.gui.settings.mining_hours_help) hoursHelp.textContent = t.gui.settings.mining_hours_help;
+
+        const hoursAlwaysLabel = document.getElementById('settings-hours-always-label');
+        if (hoursAlwaysLabel && t.gui.settings.mining_hours_always) hoursAlwaysLabel.textContent = t.gui.settings.mining_hours_always;
+
+        const hoursRangeLabel = document.getElementById('settings-hours-range-label');
+        if (hoursRangeLabel && t.gui.settings.mining_hours_range) hoursRangeLabel.textContent = t.gui.settings.mining_hours_range;
+
+        const hoursStartLabel = document.getElementById('settings-hours-start-label');
+        if (hoursStartLabel && t.gui.settings.mining_hours_start) hoursStartLabel.textContent = t.gui.settings.mining_hours_start + ' ';
+
+        const hoursEndLabel = document.getElementById('settings-hours-end-label');
+        if (hoursEndLabel && t.gui.settings.mining_hours_end) hoursEndLabel.textContent = t.gui.settings.mining_hours_end + ' ';
 
         const gamesHelp = document.getElementById('settings-games-help');
         if (gamesHelp) gamesHelp.textContent = t.gui.settings.games_help;
@@ -2428,6 +2609,22 @@ function applyTranslations(t) {
 
         const reloadBtn = document.getElementById('reload-btn');
         if (reloadBtn) reloadBtn.textContent = t.gui.settings.reload_campaigns;
+
+        const discordTrans = t.gui?.settings?.discord;
+        if (discordTrans) {
+            const labels = {
+                'settings-discord-header': 'name', 'settings-discord-help': 'description',
+                'settings-discord-webhook-url-label': 'webhook_url',
+                'settings-discord-webhook-url-hint': 'webhook_url_hint',
+                'settings-discord-credentials-help': 'credentials_help',
+                'save-discord-btn': 'save_settings', 'test-discord-btn': 'test_connection',
+                'remove-discord-btn': 'remove_webhook'
+            };
+            for (const [id, key] of Object.entries(labels)) {
+                const element = document.getElementById(id);
+                if (element) element.textContent = discordTrans[key];
+            }
+        }
 
         // Update Telegram Notifications section.
         const tgTrans = (t.settings && t.settings.telegram) || (t.gui && t.gui.settings && t.gui.settings.telegram) || null;
@@ -2468,6 +2665,10 @@ function applyTranslations(t) {
 
         const clearCacheHelp = document.getElementById('clear-cache-help');
         if (clearCacheHelp) clearCacheHelp.textContent = t.gui.settings.clear_all_cache_help;
+        const diagnosticsButton = document.getElementById('dump-diagnostics-btn');
+        if (diagnosticsButton) diagnosticsButton.textContent = t.gui.settings.dump_diagnostics;
+        const diagnosticsHelp = document.getElementById('diagnostics-help');
+        if (diagnosticsHelp) diagnosticsHelp.textContent = t.gui.settings.diagnostics_help;
 
         // Re-render games to watch with translated empty messages
         renderGamesToWatch();
@@ -2528,6 +2729,11 @@ function applyTranslations(t) {
                            makeElement('p', {}, tg.description),
                            makeHelpList('ol', tg.steps)]
                         : [];
+                })(),
+                ...(function () {
+                    const dc = t.gui?.settings?.discord;
+                    return dc ? [makeElement('h3', { id: 'help-discord-header' }, dc.name),
+                        makeElement('p', {}, dc.description), makeHelpList('ol', dc.setup_steps)] : [];
                 })(),
                 makeElement('div', { class: 'help-links' }, '', el =>
                     el.appendChild(makeElement('a', { href: 'https://github.com/rangermix/TwitchDropsMiner', target: '_blank', rel: 'noopener noreferrer' }, t.gui.help.github_repo || 'GitHub Repository'))
@@ -2666,6 +2872,49 @@ async function clearAllCache() {
     await requestCampaignRefresh('/api/cache/clear', button, 'clear cache');
 }
 
+async function dumpDiagnostics() {
+    const button = document.getElementById('dump-diagnostics-btn');
+    const result = document.getElementById('diagnostics-result');
+    if (!button || !result || button.disabled) return;
+    const t = state.translations?.gui?.settings;
+    if (!t) return;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    result.textContent = t.diagnostics_saving;
+    result.className = 'help-text';
+    const agent = navigator.userAgent || '';
+    const browser = /Edg\//.test(agent) ? 'Edge' : /Firefox\//.test(agent) ? 'Firefox'
+        : /Chrome\//.test(agent) ? 'Chrome' : /Safari\//.test(agent) ? 'Safari' : 'Other';
+    const platform = /Android/.test(agent) ? 'Android' : /iPhone|iPad/.test(agent) ? 'iOS'
+        : /Windows/.test(agent) ? 'Windows' : /Macintosh/.test(agent) ? 'macOS'
+        : /Linux/.test(agent) ? 'Linux' : 'Other';
+    try {
+        const response = await fetch('/api/diagnostics', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-TDM-Request': '1' },
+            body: JSON.stringify({ browser: {
+                width: Math.min(32000, Math.max(0, Math.round(window.innerWidth))),
+                height: Math.min(32000, Math.max(0, Math.round(window.innerHeight))),
+                browser, platform, tab: 'settings', online: Boolean(navigator.onLine),
+                socket_connected: Boolean(socket && socket.connected)
+            } })
+        });
+        const data = await response.json();
+        if (!response.ok || data.success !== true || typeof data.file !== 'string') {
+            result.textContent = response.status === 429 ? t.diagnostics_busy : t.diagnostics_error;
+            result.className = 'help-text error';
+            return;
+        }
+        result.textContent = t.diagnostics_saved.replace('{path}', `data/${data.file}`);
+        result.className = 'help-text success';
+    } catch (_) {
+        result.textContent = t.diagnostics_error;
+        result.className = 'help-text error';
+    } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+    }
+}
+
 
 // ==================== Mining Process Control ====================
 
@@ -2781,6 +3030,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyInventoryViewMode(e.target.checked);
         saveSettings();
     });
+    document.getElementById('priority-list-only').addEventListener('change', onPriorityModeChange);
     document.getElementById('language').addEventListener('change', saveSettings);
     document.getElementById('connection-quality').addEventListener('change', saveSettings);
     document.getElementById('minimum-refresh-interval').addEventListener('change', saveSettings);
@@ -2794,6 +3044,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('random-breaks-enabled')?.addEventListener('change', saveSettings);
     document.getElementById('random-break-interval-hours')?.addEventListener('change', saveSettings);
     document.getElementById('random-break-duration-minutes')?.addEventListener('change', saveSettings);
+    ['mining-hours-always', 'mining-hours-range', 'mining-hours-start', 'mining-hours-end']
+        .forEach(id => document.getElementById(id).addEventListener('change', onMiningHoursChange));
     document.getElementById('drop-name-blacklist').addEventListener('change', saveSettings);
     document.getElementById('allow-unlinked-campaigns').addEventListener('change', onUnlinkedMiningChange);
     // Proxy uses a manual "Set Proxy" button instead of auto-save
@@ -2808,10 +3060,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     document.getElementById('verify-proxy-btn').addEventListener('click', verifyProxy);
+    document.getElementById('test-discord-btn').addEventListener('click', () => updateDiscordSettings('test'));
+    document.getElementById('save-discord-btn').addEventListener('click', () => updateDiscordSettings('save'));
+    document.getElementById('remove-discord-btn').addEventListener('click', () => updateDiscordSettings('remove'));
     document.getElementById('test-telegram-btn').addEventListener('click', testTelegramConnection);
     document.getElementById('save-telegram-btn').addEventListener('click', handleSaveTelegramClick);
     document.getElementById('reload-btn').addEventListener('click', reloadCampaigns);
     document.getElementById('clear-cache-btn').addEventListener('click', clearAllCache);
+    document.getElementById('dump-diagnostics-btn').addEventListener('click', dumpDiagnostics);
 
     // History tab
     document.getElementById('history-btn-filter')?.addEventListener('click', () => {
@@ -3317,7 +3573,8 @@ async function clearHistory() {
 
 // ==================== DOM Utilities ====================
 
-const TRUSTED_HELP_LINKS = new Set(['https://www.twitch.tv/drops/campaigns', 'https://t.me/BotFather']);
+const TRUSTED_HELP_LINKS = new Set(['https://www.twitch.tv/drops/campaigns',
+    'https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks', 'https://t.me/BotFather']);
 
 function tgHelpSetup(t) {
     const tg = (t.settings && t.settings.telegram) || (t.gui && t.gui.settings && t.gui.settings.telegram) || null;
@@ -3373,7 +3630,7 @@ function makeHelpList(tag, items) {
 
 function appendTrustedHelpContent(parent, text) {
     const source = String(text);
-    const linkPattern = /<a\b[^>]*\bhref=(["'])(https:\/\/www\.twitch\.tv\/drops\/campaigns|https:\/\/t\.me\/BotFather)\1[^>]*>(.*?)<\/a>/gi;
+    const linkPattern = /<a\b[^>]*\bhref=(["'])(https:\/\/support\.discord\.com\/hc\/en-us\/articles\/228383668-Intro-to-Webhooks|https:\/\/www\.twitch\.tv\/drops\/campaigns|https:\/\/t\.me\/BotFather)\1[^>]*>(.*?)<\/a>/gi;
     let lastIndex = 0;
     let match;
     let matched = false;

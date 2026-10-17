@@ -54,6 +54,7 @@ class GUIStatus(TypedDict):
     fetching_inventory: str
     fetching_campaigns: str
     adding_campaigns: str
+    outside_hours: str
 
 
 class GUITabs(TypedDict):
@@ -213,6 +214,24 @@ class GUISettingsGeneral(TypedDict):
     dark_mode: str
 
 
+class GUIDiscordSettings(TypedDict):
+    name: str
+    description: str
+    webhook_url: str
+    webhook_url_hint: str
+    setup_steps: list[str]
+    success: str
+    saved: str
+    error: str
+    missing_credentials: str
+    remove_webhook: str
+    removed: str
+    credentials_help: str
+    save_error: str
+    save_settings: str
+    test_connection: str
+
+
 class GUITelegramSettings(TypedDict):
     name: str
     description: str
@@ -237,6 +256,7 @@ class GUISettings(TypedDict):
     allow_unlinked_campaigns_warning: str
     allow_unlinked_campaigns_save_error: str
     general: GUISettingsGeneral
+    discord: GUIDiscordSettings
     telegram: GUITelegramSettings
     mining_benefits: str
     mining_benefits_help: str
@@ -247,8 +267,16 @@ class GUISettings(TypedDict):
     drop_name_blacklist_placeholder: str
     clear_all_cache: str
     clear_all_cache_help: str
+    dump_diagnostics: str
+    diagnostics_help: str
+    diagnostics_saving: str
+    diagnostics_saved: str
+    diagnostics_error: str
+    diagnostics_busy: str
     games_to_watch: str
     games_help: str
+    priority_list_only: str
+    priority_list_only_save_error: str
     search_games: str
     add_game: str
     add_game_hint: str
@@ -269,6 +297,13 @@ class GUISettings(TypedDict):
     actions: str
     connection_quality: str
     minimum_refresh: str
+    mining_hours: str
+    mining_hours_help: str
+    mining_hours_always: str
+    mining_hours_range: str
+    mining_hours_start: str
+    mining_hours_end: str
+    mining_hours_save_error: str
 
 
 class GUIHelp(TypedDict):

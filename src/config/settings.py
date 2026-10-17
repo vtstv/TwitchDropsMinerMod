@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal, TypedDict, cast
@@ -27,9 +28,11 @@ default_settings = {
     "allow_unlinked_campaigns": False,
     "connection_quality": 1,
     "dark_mode": False,
+    "discord_webhook_url": "",
     "drop_name_blacklist": [],
     "games_to_watch": [],
     "language": DEFAULT_LANG,
+    "priority_list_only": True,
     "inventory_filters": {
         "game_name_search": [],
         "show_active": False,
@@ -50,6 +53,11 @@ default_settings = {
         "EMOTE": True,
         "UNKNOWN": True,
     },
+    "mining_hours": {
+        "mode": "always",
+        "start": "08:00",
+        "end": "22:00",
+    },
     "proxy": "",
     "telegram_bot_token": "",
     "telegram_chat_id": "",
@@ -64,6 +72,25 @@ default_settings = {
     "random_break_duration_minutes": 5,
     "all_drops_games": [],
 }
+
+
+class MiningHoursSettings:
+    """Validate the complete daily schedule before it changes live policy."""
+
+    @staticmethod
+    def normalize(value: Any) -> dict[str, str]:
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"mode", "start", "end"}
+            or value.get("mode") not in ("always", "range")
+            or any(
+                not isinstance(value.get(key), str)
+                or re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value[key]) is None
+                for key in ("start", "end")
+            )
+        ):
+            raise ValueError("Invalid mining hours")
+        return dict(value)
 
 
 class InventoryFilterSettings:
@@ -94,13 +121,16 @@ class Settings:
     allow_unlinked_campaigns: bool
     connection_quality: int
     dark_mode: bool
+    discord_webhook_url: str
     drop_name_blacklist: list[str]
     games_to_watch: list[str]
     language: str
+    priority_list_only: bool
     inventory_filters: InventoryFilters
     inventory_list_view: bool
     minimum_refresh_interval_minutes: int
     mining_benefits: dict[str, bool]
+    mining_hours: dict[str, str]
     proxy: str
     telegram_bot_token: str
     telegram_chat_id: str
@@ -152,6 +182,8 @@ class Settings:
             val = settings.pop("mine_unlinked_campaigns")
             if isinstance(val, bool):
                 settings["allow_unlinked_campaigns"] = val
+        if "mining_hours" in settings:
+            settings["mining_hours"] = MiningHoursSettings.normalize(settings["mining_hours"])
         merge_json(settings, default_settings)
         settings.pop("allow_helper_connection", None)
         for key, value in settings.items():
@@ -167,6 +199,7 @@ class Settings:
         )
 
     def save(self) -> None:
+        self.mining_hours = MiningHoursSettings.normalize(self.mining_hours)
         self.drop_name_blacklist = DropIgnorePolicy.normalize_keywords(
             self.drop_name_blacklist
         )

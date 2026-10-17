@@ -70,7 +70,8 @@
             "fetching_inventory": "Coletando inventário...",
             "fetching_campaigns": "Coletando campanhas...",
             "adding_campaigns": "Adicionando as campanhas para o sistema... {counter}",
-            "ready": "Pronto"
+            "ready": "Pronto",
+            "outside_hours": "Fora do horário de mineração"
         },
         "tabs": {
             "main": "Principal",
@@ -164,6 +165,8 @@
             "reload": "Recarregar",
             "games_to_watch": "Jogos para assistir",
             "games_help": "Selecione os jogos para assistir. A ordem importa - arraste para reordenar a prioridade (topo = maior prioridade).",
+            "priority_list_only": "Apenas lista de prioridade (minerar somente jogos selecionados)",
+            "priority_list_only_save_error": "Não foi possível salvar a opção de prioridade dos jogos. Tente novamente.",
             "search_games": "Procurar jogos...",
             "select_all": "Selecionar tudo",
             "deselect_all": "Desmarcar tudo",
@@ -220,7 +223,44 @@
             "remove_game": "Remover {game}",
             "allow_unlinked_campaigns": "Permitir minerar campanhas indicadas como não vinculadas",
             "allow_unlinked_campaigns_warning": "Aviso: isto ignora apenas a verificação de vínculo de conta do TDM. Não vincula contas nem garante progresso na Twitch, resgates ou recompensas no jogo. O TDM pode mostrar minutos estimados. Confira o inventário de Drops da Twitch e vincule a conta de jogo correta para receber recompensas.",
-            "allow_unlinked_campaigns_save_error": "Não foi possível salvar a opção de mineração de contas não vinculadas. Tente novamente."
+            "allow_unlinked_campaigns_save_error": "Não foi possível salvar a opção de mineração de contas não vinculadas. Tente novamente.",
+            "dump_diagnostics": "Guardar dados de diagnóstico",
+            "diagnostics_help": "Guarda o estado desidentificado do minerador e as respostas recentes das APIs, depuradas, em data/diagnostics no volume de dados montado.",
+            "diagnostics_saving": "A guardar dados de diagnóstico…",
+            "diagnostics_saved": "Dados de diagnóstico guardados em {path}.",
+            "diagnostics_error": "Não foi possível guardar os dados de diagnóstico. Tente novamente.",
+            "diagnostics_busy": "Já está a ser guardado um diagnóstico ou acabou de ser guardado. Aguarde alguns segundos e tente novamente.",
+            "mining_hours": "Horário de mineração",
+            "mining_hours_help": "Usa a hora local do minerador (Docker TZ). O intervalo pode atravessar a meia-noite; início e fim iguais significam o dia todo. Fora do intervalo, a visualização pausa e retoma automaticamente.",
+            "mining_hours_always": "Dia inteiro (24/7)",
+            "mining_hours_range": "Intervalo de tempo personalizado",
+            "mining_hours_start": "Início",
+            "mining_hours_end": "Fim",
+            "mining_hours_save_error": "Não foi possível guardar o horário. Tente novamente.",
+            "discord": {
+                "name": "Notificações do Discord",
+                "description": "Receba notificações no Discord quando reclamar drops.",
+                "webhook_url": "URL do Webhook do Discord",
+                "webhook_url_hint": "Cole a URL completa do webhook (ela contém seu token secreto).",
+                "setup_steps": [
+                    "Abra o seu servidor do Discord e vá às configurações do canal (ícone de engrenagem ao lado do nome do canal)",
+                    "Vá para Integrações → Webhooks",
+                    "Clique em Novo webhook, dê um nome e escolha o canal de texto (veja <a href=\"https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks\" target=\"_blank\">Introdução aos webhooks</a>)",
+                    "Clique em Copiar URL do webhook - fica assim: https://discord.com/api/webhooks/ID/TOKEN",
+                    "Cole a URL no campo URL do Webhook do Discord nas Configurações e clique em Salvar configurações",
+                    "Clique em Testar conexão para verificar e receber uma notificação de teste"
+                ],
+                "success": "✓ Conexão com o Discord bem-sucedida! Você receberá notificações de drops.",
+                "saved": "✓ Configurações salvas com sucesso!",
+                "error": "Falha ao conectar ao Discord. Verifique sua URL de webhook.",
+                "missing_credentials": "Insira uma URL de Webhook do Discord. Consulte as instruções na guia Ajuda.",
+                "remove_webhook": "Remover webhook",
+                "removed": "Webhook removido. As notificações do Discord estão desativadas.",
+                "credentials_help": "Deixe a URL vazia para reutilizar o webhook salvo. Remover webhook desativa as notificações e apaga a URL salva.",
+                "save_error": "Não foi possível salvar as configurações do Discord.",
+                "save_settings": "Salvar configurações",
+                "test_connection": "Testar Conexão"
+            }
         },
         "help": {
             "about": "Sobre o Twitch Drops Miner",

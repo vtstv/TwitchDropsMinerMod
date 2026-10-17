@@ -162,6 +162,26 @@ lang/                # Translation JSON files (20 languages)
 - `Stream` class: Active stream with game, viewers, drop status
 - Stream URL fetching and validation
 - ACL-based vs directory channels
+- `Channel.banned` accepts an error-free, matching-channel `user.self.banStatus`
+  object with boolean `isPermanent`. Both true and false mean an active ban; false
+  identifies a temporary ban. Null explicitly clears a ban. Missing, malformed or
+  errored responses retain known state. A temporary ban expires at a valid, timezone-aware
+  `expiresAt`; absent or invalid expiry waits for a confirmed null status. Permanent
+  bans ignore expiry. This account-specific field comes from the separate raw
+  `ChannelBanStatus` query to Twitch GraphQL, not broadcast status or watch failures.
+- `ChannelService.filter_banned_channels()` checks every discovery/reload candidate in
+  batches of 20 with a ten-second timeout, drains tasks on cancellation/exit, and
+  removes confirmed bans before sorting and the tracking cap. Preserve existing
+  persisted stream reads and safe-read retry rules. Optional failures do not classify
+  unknown channels as banned. Watch eligibility and transport also reject known bans,
+  including manual selection and special-category ACLs. Explicit unbans take effect at
+  the next discovery/reload check; temporary expiry queues discovery automatically.
+  Retain known bans across rediscovery failures and synchronize watched/manual objects
+  by channel ID, preserve known bans on optional failures, and keep delayed online checks
+  from redisplaying a banned channel. Regression coverage: `tests/test_banned_channels.py`.
+  Keep confirmed bans and expiry callbacks across cache recovery until expiry or a
+  confirmed null response. Cancel callbacks and clear account-owned ban state on
+  identity replacement and shutdown.
 
 **src/models/campaign.py** - Drop campaigns:
 
@@ -204,6 +224,26 @@ lang/                # Translation JSON files (20 languages)
 - The Settings **Clear All Cache** action discards local campaign, channel, and other
   derived miner state, preserves OAuth login and settings, and then reloads from Twitch.
   It is a recovery and diagnostic action, not a correction for Twitch campaign metadata.
+- **Dump diagnosis data** calls dashboard-protected `POST /api/diagnostics`; retain
+  origin/CSRF guards, a 4-KiB body limit, allowlisted browser metadata and fixed redacted
+  validation/storage errors. There is no upload or file-download route. `Diagnostics`
+  in `src/diagnostics.py` owns per-client capture, strict snapshot projection and atomic
+  saves in `DATA_DIR/diagnostics` (`/app/data/diagnostics` in Docker). Keep the directory
+  0700 and files 0600 on POSIX, reject symlinks, drain cancelled writer threads while
+  holding the admission lock, and enforce the ten-second cooldown. Retain ten generated
+  files, each at most 8 MiB, with explicit snapshot/truncation counts.
+- Capture responses from the miner HTTP transport, authenticated GraphQL/OAuth
+  transport, SDK integrity exchange, Twitch websocket, Telegram, version checks and
+  proxy verification. Sanitize before retaining any payload; keep two recent samples
+  per API operation plus counts. API body capture is capped at 256 KiB, with bounded
+  nodes/depth/arrays. New response reads must also be bounded. Non-JSON bodies and
+  rejected authentication responses retain only metadata. Never record request headers,
+  cookies, tokens, passwords, SDK/browser profiles, verification data, signed URLs or
+  formatted logs/tracebacks. Unknown keys/free text and identities use HMAC aliases;
+  exports use fresh per-dump aliases. Project snapshot booleans/numbers strictly rather
+  than trusting raw model annotations. Clear capture state on account replacement;
+  remove the warning-location handler on shutdown. Regression coverage:
+  `tests/test_diagnostics.py` and `tests/test_diagnostics_frontend.py`.
 - `serve_index()` replaces the `__APP_VERSION__` placeholder in local CSS/JavaScript URLs
   with the application version and serves `/` with `Cache-Control: no-cache`
 - Any `app.js` or `styles.css` change requires an application version bump through the release
@@ -236,6 +276,20 @@ lang/                # Translation JSON files (20 languages)
 **src/config/settings.py** - Application settings:
 
 - Games to watch list (auto-populated from available campaigns if empty)
+- Available from v2.3.0, `priority_list_only` defaults to true. Disable it to append
+  other eligible games to the runtime wanted queue without changing saved Games to Watch. Both modes use
+  the same watch-drop, claim, expiry, mineability, benefit and campaign eligibility
+  guards; omit empty campaigns and games. Fallback games sort by earliest remaining
+  campaign end, then game name. Selected campaigns take precedence over fallback,
+  including Special Events/IRL ACL channels streaming another category. Use
+  `ChannelService.get_mining_priority()` for discovery and automatic switching;
+  preserve `get_priority()` and strict-mode streamed-category ordering. Failed
+  settings saves restore the previous mode and must not trigger policy refresh.
+- Successful unclaimed-to-claimed transitions request a queued games update so
+  claiming the last wanted reward also releases campaigns with unwanted rewards
+  remaining. Failed or repeated claims must not enqueue duplicate updates.
+- `tests/test_priority_fallback.py` and `tests/test_priority_fallback_frontend.py`
+  cover both modes and their boundaries.
 - Games can also be added manually from the web settings search box. Exact and
   unique partial matches resolve to available game names; ambiguous matches do not
   add a game. Confirmations support keyboard focus and Escape. Select All preserves
@@ -268,6 +322,17 @@ lang/                # Translation JSON files (20 languages)
   actively watched channel remains visible while game settings are changing
 - Consecutive identical no-active-campaign console prompts are collapsed until another
   console message appears
+- Mining hours default to `always`; `range` uses the miner host's local time (Docker `TZ`),
+  inclusive start/exclusive end, supports overnight windows, and treats equal times as all day.
+  Validate complete `mode`/`start`/`end` objects before live changes or loading saved values;
+  failed persistence restores the previous schedule. The UI uses a dedicated save with
+  required time inputs and translated errors. Never silently default an invalid range.
+  The schedule task enforces closing and reopening, wakes on policy edits, resamples wall
+  time at least every minute, and is cancelled and awaited during authentication changes
+  and run exit. Gate watch selection, playlist/Spade freshness, and progress polling too.
+  Defer pending inventory/policy/cache requests while closed without setting a busy-loop
+  event; fetch fresh inventory on reopening. Existing websocket claims remain available.
+  Regressions live in `tests/test_mining_hours.py` and `tests/test_mining_hours_frontend.py`.
 - Telegram drop notifications use a bot token stored server-side. The web API/socket
   never echoes the stored token: `get_settings()` returns only a `telegram_configured`
   flag and a masked placeholder, console logs mask the value, and a submitted value equal
@@ -278,6 +343,16 @@ lang/                # Translation JSON files (20 languages)
 - The Telegram form reuses the saved token when its input is blank. Clearing the chat ID
   and saving disables alerts. Test Connection waits for settings persistence before showing
   success; HTTP, network, and application save failures must remain visible as errors.
+- Discord alerts also originate in the shared `BaseDrop.claim()` transition and must
+  preserve Telegram, history and successful Twitch claims on notification failure.
+  `DiscordNotifier` accepts only `https://discord.com/api/webhooks/ID/TOKEN`, refuses
+  redirects, disables mentions, bounds transport to ten seconds, and never logs URLs,
+  response bodies or exception text. Diagnostics retain only status/outcome metadata.
+  Settings expose a mask/configured flag, reuse a blank URL, and use the explicit
+  `discord_remove_webhook` action to delete it and disable alerts. Validate before
+  mutation; restore the previous webhook on save failure. API validation errors must
+  not echo submitted settings. Test Connection reports success only after saving.
+  Preserve localized safe Help rendering and `tests/test_discord_*` coverage.
 - `tests/test_telegram_frontend.py`, `tests/test_telegram_api.py`, and
   `tests/test_telegram_integration.py` cover translated Help rendering, stored credentials,
   failed saves, disabling, all shared claim paths, and transport failures without sending
@@ -300,6 +375,21 @@ progress to an ignored drop while the miner intentionally targets another reward
 7. Loop between CHANNEL_SWITCH and periodic INVENTORY_FETCH (hourly)
 
 ### Authentication and integrated browser login
+
+- Helper admission preserves allowlisted validation codes without printing remote text.
+  Catalog rejection logs contain only fixed error categories and field-shape labels.
+  Preserve redaction, strict catalog validation, and lost-ack receipt reconciliation.
+  `SessionDiagnostic` owns fixed code/stage/reason/operation labels and separate dashboard
+  and upstream HTTP statuses. Keep `/api/helper/*`'s existing `detail` strings and add only
+  sanitized metadata; helper/browser/renewal status exposes the same diagnosis. Distinguish
+  captured-session validation, server issuance, issued-session validation and persistence.
+  Unknown upstream causes stay `unknown`; never expose arbitrary text, values or exception
+  messages. Generic/transport/5xx failures can have an unknown post-upload outcome; query
+  the receipt without repeating the upload. A newer attempt must clear older diagnostics.
+  Keep transient renewal retries and cancellation semantics. CLI diagnostics use the
+  invariant `SESSION_DIAGNOSTIC` machine marker with JSON; existing guidance stays translated.
+  Tests in `test_session_diagnostics.py` and `test_helper_diagnostics.py` cover redaction,
+  code completeness, admission phases, storage, cancellation and renewal errors.
 
 - `ImportedSession` owns validated WEB contexts and reads persisted formats 1/2/3.
   Accepted browser state takes precedence over valid saved Android cookies. Fresh,
