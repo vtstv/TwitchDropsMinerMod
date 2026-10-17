@@ -74,7 +74,7 @@ class WatchService:
         Returns:
             True if the channel can be watched, False otherwise
         """
-        if not self._twitch.mining_enabled:
+        if not getattr(self._twitch, "mining_enabled", True):
             return False
         wanted_games = self._twitch.wanted_games
         if not wanted_games or not channel.online or channel.banned:
