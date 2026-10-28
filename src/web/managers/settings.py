@@ -9,7 +9,12 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from src.config.reward_priority import RewardPriority
-from src.config.settings import InventoryFilterSettings, MiningHoursSettings, Settings, default_settings
+from src.config.settings import (
+    InventoryFilterSettings,
+    MiningHoursSettings,
+    Settings,
+    default_settings,
+)
 from src.i18n.translator import _
 from src.models.game import Game
 from src.services.discord_service import DiscordNotifier

@@ -155,11 +155,17 @@ class Twitch:
 
     def pause_mining(self) -> None:
         """Pause mining activity without terminating the application."""
+        self.mining_enabled = False
         self.set_paused(True)
+        if self.gui:
+            self.gui.status.update("⏸ Mining paused")
 
     def resume_mining(self) -> None:
         """Resume mining activity."""
+        self.mining_enabled = True
         self.set_paused(False)
+        if self.gui:
+            self.gui.status.update("▶ Resuming mining...")
         if hasattr(self, "_watch_service") and self._watch_service:
             self._watch_service.reset_break_timer()
 
