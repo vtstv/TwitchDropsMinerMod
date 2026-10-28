@@ -179,6 +179,10 @@ class WebGUIManager:
             self._broadcaster.emit("mining_state", {"mining_enabled": mining_enabled})
         )
 
+    def broadcast_paused(self, pause_info: dict) -> None:
+        """Broadcast pause state from Twitch.pause_info() to connected clients."""
+        asyncio.create_task(self._broadcaster.emit("paused_update", pause_info))
+
     def get_wanted_game_tree(self) -> list[dict]:
         return self._stream_selector.get_wanted_game_tree(
             self._twitch.settings, self._twitch.inventory

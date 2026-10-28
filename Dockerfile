@@ -7,7 +7,7 @@ FROM python:alpine
 # Build arguments for metadata
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VERSION="2.3.0-mod"
+ARG VERSION="2.4.0-mod"
 
 # Labels following OCI Image Format Specification
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
@@ -42,7 +42,7 @@ COPY web/ ./web/
 
 # Login and renewal use private browsers; only the dashboard port is exposed.
 RUN apk upgrade --no-cache && \
-    apk add --no-cache chromium xvfb openbox x11vnc xdotool tzdata && \
+    apk add --no-cache chromium xvfb xvfb-run xauth openbox x11vnc xdotool tzdata && \
     addgroup -g 10001 -S tdm-browser && \
     adduser -u 10001 -S -D -H -h /nonexistent -s /sbin/nologin -G tdm-browser tdm-browser && \
     pip install --no-cache-dir . && \

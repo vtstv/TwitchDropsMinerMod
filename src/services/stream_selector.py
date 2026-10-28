@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from src.config.reward_priority import RewardPriority
 from src.config.settings import Settings
 from src.models.campaign import DropsCampaign
 from src.models.game import Game
@@ -15,10 +16,14 @@ ALL_BENEFITS_ENABLED: dict[str, bool] = {
 
 class StreamSelector:
     def _get_wanted_drops(
-        self, campaign: DropsCampaign, mining_benefits: dict[str, bool], now: datetime
+        self, campaign: DropsCampaign, mining_benefits: dict[str, bool], now: datetime,
+        policy: RewardPriority | None = None
     ) -> list[dict]:
         wanted_drops = []
-        for drop in campaign.drops:
+        drops = list(campaign.drops)
+        if policy is not None and policy.enabled:
+            drops.sort(key=policy.eligible_drop_key)
+        for drop in drops:
             if (
                 not drop.is_watch_drop
                 or drop.is_claimed
@@ -58,7 +63,7 @@ class StreamSelector:
                 continue
             if not campaign.can_earn_within(stamp):
                 continue
-            if not self._get_wanted_drops(campaign, settings.mining_benefits, now):
+            if not self._get_wanted_drops(campaign, settings.mining_benefits, now, RewardPriority(settings)):
                 continue
             if campaign_game.id not in unlisted_campaigns:
                 unlisted_campaigns[campaign_game.id] = {
@@ -83,7 +88,7 @@ class StreamSelector:
                     "id": campaign.id,
                     "name": campaign.name,
                     "url": campaign.campaign_url,
-                    "drops": self._get_wanted_drops(campaign, settings.mining_benefits, now),
+                    "drops": self._get_wanted_drops(campaign, settings.mining_benefits, now, RewardPriority(settings)),
                 }
                 for campaign in sorted(fallback_game["campaigns"], key=lambda campaign: campaign.ends_at)
             ]
@@ -96,7 +101,7 @@ class StreamSelector:
         Get the hierarchical tree of wanted items (Games -> Campaigns -> Drops -> Benefits).
         Include campaigns available within an hour, with selected games first.
         """
-        wanted_games = []
+        wanted_games: list[dict] = []
         queued_ids: set[int] = set()
         games_to_watch = list(settings.games_to_watch or [])
         mining_benefits = settings.mining_benefits
@@ -137,7 +142,7 @@ class StreamSelector:
                 if not campaign.can_earn_within(next_hour):
                     continue
 
-                wanted_drops = self._get_wanted_drops(campaign, effective_benefits, now)
+                wanted_drops = self._get_wanted_drops(campaign, effective_benefits, now, RewardPriority(settings))
 
                 if len(wanted_drops) > 0:
                     wanted_campaigns.append(
@@ -165,6 +170,19 @@ class StreamSelector:
                 )
 
         self._append_unlisted_games(wanted_games, settings, campaigns, now, next_hour)
+        policy = RewardPriority(settings)
+        if policy.enabled:
+            selected = {name.lower() for name in settings.games_to_watch}
+            def key(game):
+                eligible = [campaign for campaign in campaigns
+                            if campaign.game == game['game_obj'] and campaign.can_earn_within(next_hour)]
+                return (0 if game['game_name'].lower() in selected else 1,
+                        min((policy.campaign_key(campaign) for campaign in eligible),
+                            default=(len(policy.TYPES), float('inf'))))
+            wanted_games.sort(key=key)
+            by_id = {campaign.id: campaign for campaign in campaigns}
+            for game in wanted_games:
+                game["campaigns"].sort(key=lambda entry: policy.campaign_key(by_id[entry["id"]]))
         return wanted_games
 
     def get_wanted_game_tree(

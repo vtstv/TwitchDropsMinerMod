@@ -6,8 +6,9 @@ from collections import OrderedDict, abc, deque
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from functools import partial
-from time import time
+from time import monotonic, time
 from typing import TYPE_CHECKING, Any, Final, Literal
+from uuid import uuid4
 
 import aiohttp
 
@@ -62,8 +63,20 @@ gql_logger = logging.getLogger("TwitchDrops.gql")
 
 
 class Twitch:
+    # User pause from the dashboard; runtime only, so a restart resumes mining.
+    _paused: bool = False
+    # Calendar pauses use a UTC instant; fixed durations use elapsed time.
+    _resume_at: datetime | None = None
+    _pause_deadline: float | None = None
+    _pause_revision: int = 0
+    PAUSE_DURATIONS: Final[dict[str, timedelta]] = {
+        "10m": timedelta(minutes=10),
+        "1h": timedelta(hours=1),
+    }
+
     def __init__(self, settings: Settings):
         self.settings: Settings = settings
+        self._pause_instance_id = uuid4().hex
         self.diagnostics = Diagnostics(DATA_DIR)
         # State management
         self._state: State = State.IDLE
@@ -128,45 +141,32 @@ class Twitch:
         self.login_browser = ContainerLogin(self.session_controller, on_change=self._session_changed)
         self.helper = HelperConnections(self.session_controller, on_change=self._session_changed)
         self._logout_lock = asyncio.Lock()
-        # Mining process control (start/stop)
-        self.mining_enabled: bool = True
+    @property
+    def mining_enabled(self) -> bool:
+        return not self._paused
+
+    @mining_enabled.setter
+    def mining_enabled(self, value: bool) -> None:
+        self.set_paused(not value)
 
     def is_mining_enabled(self) -> bool:
         """Return whether mining is currently enabled."""
-        return self.mining_enabled
+        return not self._paused
 
     def pause_mining(self) -> None:
         """Pause mining activity without terminating the application."""
-        if not self.mining_enabled:
-            return
-        self.mining_enabled = False
-        self.stop_watching()
-        self.change_state(State.IDLE)
-        self.print("⏸ Mining paused by user", collapse_key="mining.paused")
-        if self.gui:
-            self.gui.status.update("⏸ Mining paused")
-            self.gui.broadcast_mining_state(False)
+        self.set_paused(True)
 
     def resume_mining(self) -> None:
         """Resume mining activity."""
-        if self.mining_enabled:
-            return
-        self.mining_enabled = True
-        self.print("▶ Mining resumed by user", collapse_key="mining.resumed")
-        if self.gui:
-            self.gui.status.update("▶ Resuming mining...")
-            self.gui.broadcast_mining_state(True)
+        self.set_paused(False)
         if hasattr(self, "_watch_service") and self._watch_service:
             self._watch_service.reset_break_timer()
-        self.request_inventory_refresh()
 
     def toggle_mining(self) -> bool:
         """Toggle mining activity between paused and active."""
-        if self.mining_enabled:
-            self.pause_mining()
-        else:
-            self.resume_mining()
-        return self.mining_enabled
+        self.set_paused(not self._paused)
+        return not self._paused
 
     def _session_changed(self) -> None:
         self.login_browser.session_changed()
@@ -209,6 +209,32 @@ class Twitch:
                 if self._browser.logged_out:
                     self.gui.login.update(_.t["login"]["status"]["logged_out"], None)
                     self.login_browser.request_login()
+
+    async def accept_token(self, token: str, authorized) -> None:
+        async with self._logout_lock:
+            if self._auth_state._logged_in.is_set() or self._browser.status()["state"] == "ready":
+                raise SessionError("BROWSER_STATE")
+            await self.helper.cancel()
+            await self.login_browser.cancel()
+            attempt = self.login_browser.attempt
+            self.login_browser.change("verifying")
+        try:
+            await self.session_controller.accept_token(token, authorized=lambda: (
+                authorized() and self.login_browser.attempt == attempt
+            ))
+        except asyncio.CancelledError:
+            if self.login_browser.attempt == attempt:
+                self.login_browser._needed = True
+                self.login_browser.change("error", "BROWSER_STATE")
+            raise
+        except SessionError as error:
+            if self.login_browser.attempt == attempt:
+                self.login_browser._needed = True
+                self.login_browser.change("error", error.code, diagnostic=error.diagnostic)
+            raise
+        else:
+            if self.login_browser.attempt == attempt:
+                self.login_browser.change("idle")
 
     @asynccontextmanager
     async def authentication_change(self):
@@ -373,7 +399,9 @@ class Twitch:
         return partial(self.change_state, state)
 
     def is_mining_time(self) -> bool:
-        """Return whether the configured mining window includes the current local time."""
+        """Return whether mining may run now: not paused and inside the mining window."""
+        if self._paused:
+            return False
         hours = getattr(self.settings, "mining_hours", None)
         if not isinstance(hours, dict) or hours.get("mode") != "range":
             return True
@@ -381,6 +409,69 @@ class Twitch:
             hours.get("start", ""), hours.get("end", ""), datetime.now()
         )
         return in_window
+
+    def pause_info(self) -> dict[str, Any]:
+        """Pause state for the dashboard; resume_at is an ISO time with offset."""
+        resume_time = self._pause_resume_time()
+        resume_at = resume_time.astimezone().isoformat() if resume_time else None
+        return {
+            "paused": self._paused, "resume_at": resume_at,
+            "revision": self._pause_revision, "instance_id": self._pause_instance_id,
+        }
+
+    def _pause_seconds_remaining(self) -> float | None:
+        if not self._paused:
+            return None
+        if self._pause_deadline is not None:
+            return self._pause_deadline - monotonic()
+        if self._resume_at is not None:
+            return (self._resume_at - datetime.now(timezone.utc)).total_seconds()
+        return None
+
+    def _pause_resume_time(self) -> datetime | None:
+        if self._pause_deadline is not None:
+            remaining = self._pause_seconds_remaining()
+            return datetime.now(timezone.utc) + timedelta(seconds=max(0.0, remaining or 0.0))
+        return self._resume_at
+
+    def set_paused(self, paused: bool, duration: str | None = None) -> None:
+        """Pause for a duration ("10m", "1h", "tomorrow" = next local midnight) or until resumed.
+
+        The schedule loop stops or restarts watching and ends timed pauses.
+        """
+        resume_at: datetime | None = None
+        deadline: float | None = None
+        if paused and duration == "tomorrow":
+            midnight = datetime.combine(datetime.now().date() + timedelta(days=1), datetime.min.time())
+            resume_at = midnight.astimezone(timezone.utc)
+        elif paused and duration is not None:
+            interval = self.PAUSE_DURATIONS[duration]
+            resume_at = datetime.now(timezone.utc) + interval
+            deadline = monotonic() + interval.total_seconds()
+        if paused == self._paused and resume_at == self._resume_at and deadline == self._pause_deadline:
+            return
+        self._paused, self._resume_at, self._pause_deadline = paused, resume_at, deadline
+        self._pause_revision += 1
+        if not paused:
+            self.print(_.t["status"]["mining_resumed"])
+        elif resume_at is None:
+            self.print(_.t["gui"]["status"]["paused"])
+        else:
+            self.print(_.t["gui"]["status"]["paused_until"].format(time=f"{resume_at.astimezone():%Y-%m-%d %H:%M}"))
+        self._schedule_changed.set()
+        if self.gui:
+            self.gui.broadcast_paused(self.pause_info())
+            self.gui.broadcast_mining_state(not paused)
+
+    def _closed_status(self) -> str:
+        """Status text while mining is not allowed to run."""
+        status = _.t["gui"]["status"]
+        if not self._paused:
+            return status["outside_hours"]
+        resume_at = self._pause_resume_time()
+        if resume_at is None:
+            return status["paused"]
+        return status["paused_until"].format(time=f"{resume_at.astimezone():%H:%M}")
 
     async def _stop_mining_schedule(self) -> None:
         task, self._schedule_task = self._schedule_task, None
@@ -392,6 +483,9 @@ class Twitch:
         """Enforce both boundaries, and recompute immediately after policy edits."""
         was_open = self.is_mining_time()
         while self._state is not State.EXIT:
+            pause_remaining = self._pause_seconds_remaining()
+            if pause_remaining is not None and pause_remaining <= 0:
+                self.set_paused(False)
             self._schedule_changed.clear()
             is_open = self.is_mining_time()
             if not is_open:
@@ -402,7 +496,7 @@ class Twitch:
                 if task is not None:
                     task.cancel()
                     await asyncio.gather(task, return_exceptions=True)
-                self.gui.status.update(_.t["gui"]["status"]["outside_hours"])
+                self.gui.status.update(self._closed_status())
                 if was_open:
                     self.change_state(State.IDLE)
             else:
@@ -415,6 +509,9 @@ class Twitch:
             delay = 60.0
             if isinstance(hours, dict) and hours.get("mode") == "range":
                 _in_window, delay = window_status(hours.get("start", ""), hours.get("end", ""), datetime.now())
+            pause_remaining = self._pause_seconds_remaining()
+            if pause_remaining is not None:
+                delay = min(delay, pause_remaining)
             # Bound wall-clock/DST resampling; monotonic multi-hour sleeps go stale.
             with suppress(TimeoutError):
                 await asyncio.wait_for(self._schedule_changed.wait(), timeout=max(0.01, min(delay, 60)))
@@ -515,12 +612,6 @@ class Twitch:
         while True:
             self._activate_pending_inventory_refresh()
             self._activate_pending_games_update()
-            if not self.mining_enabled:
-                self.gui.status.update("⏸ Mining paused")
-                self.stop_watching()
-                self._state_change.clear()
-                await self._state_change.wait()
-                continue
             if self._state not in (State.EXIT, State.IDLE) and not self.is_mining_time():
                 # Defer queued work until reopening without reactivating its event.
                 self.stop_watching()
@@ -529,7 +620,7 @@ class Twitch:
                 if self.is_mining_time():
                     self.gui.status.update(_.t["gui"]["status"]["idle"])
                 else:
-                    self.gui.status.update(_.t["gui"]["status"]["outside_hours"])
+                    self.gui.status.update(self._closed_status())
                 self.stop_watching()
                 # clear the flag and wait until it's set again
                 self._state_change.clear()

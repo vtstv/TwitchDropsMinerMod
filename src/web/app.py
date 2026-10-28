@@ -5,7 +5,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from urllib.parse import quote
 
 import socketio
@@ -18,12 +18,14 @@ from pydantic import BaseModel, StrictBool, field_validator
 from starlette.middleware.cors import CORSMiddleware
 
 from src.config.paths import DATA_DIR
+from src.config.reward_priority import RewardPriority
 from src.config.settings import InventoryFilterSettings, MiningHoursSettings
 from src.version import __mod_version__, __version__
 from src.web.auth import AuthAPI, AuthMiddleware, AuthSocketServer, WebAuth
 from src.web.diagnostics_api import DiagnosticsAPI
 from src.web.helper_api import HelperAPI
 from src.web.session_api import SessionAPI
+from src.web.session_viewer import SessionViewer
 
 
 if TYPE_CHECKING:
@@ -38,7 +40,8 @@ logger = logging.getLogger("TwitchDrops")
 # Create FastAPI app
 app = FastAPI(title="Twitch Drops Miner Web", version=__version__)
 
-web_auth = WebAuth(DATA_DIR / "web_auth.json", public_base_url=os.environ.get("PUBLIC_BASE_URL", ""))
+web_auth = WebAuth(DATA_DIR / "web_auth.json", public_base_url=os.environ.get("PUBLIC_BASE_URL", ""),
+                   allowed_hosts=os.environ.get("ALLOWED_HOSTS", ""))
 sio = AuthSocketServer(web_auth)
 app.include_router(AuthAPI(web_auth, sio).router)
 app.add_middleware(AuthMiddleware, auth=web_auth)
@@ -67,8 +70,10 @@ gui_manager: WebGUIManager | None = None
 twitch_client: Twitch | None = None
 _server_instance: uvicorn.Server | None = None
 
-app.include_router(SessionAPI(web_auth, lambda: twitch_client).router)
-app.include_router(HelperAPI(web_auth, lambda: twitch_client).router)
+session_api = SessionAPI(web_auth, lambda: twitch_client)
+app.include_router(session_api.router)
+helper_api = HelperAPI(web_auth, lambda: twitch_client)
+app.include_router(helper_api.router)
 app.include_router(DiagnosticsAPI(lambda: twitch_client).router)
 
 
@@ -92,6 +97,7 @@ class SettingsUpdate(BaseModel):
     dark_mode: bool | None = None
     language: str | None = None
     priority_list_only: bool | None = None
+    reward_priority: list[str] | None = None
     proxy: str | None = None
     connection_quality: int | None = None
     minimum_refresh_interval_minutes: int | None = None
@@ -115,6 +121,11 @@ class SettingsUpdate(BaseModel):
     all_drops_games: list[str] | None = None
     mining_hours: dict | None = None
 
+    @field_validator("reward_priority")
+    @classmethod
+    def validate_reward_priority(cls, value: list[str] | None) -> list[str] | None:
+        return RewardPriority.normalize(value) if value is not None else None
+
     @field_validator("mining_hours")
     @classmethod
     def validate_mining_hours(cls, value: dict | None) -> dict | None:
@@ -123,13 +134,12 @@ class SettingsUpdate(BaseModel):
     @field_validator("inventory_filters")
     @classmethod
     def validate_link_status(cls, value: dict | None) -> dict | None:
-        if (
-            value is not None
-            and "link_status" in value
-            and value["link_status"] not in InventoryFilterSettings.LINK_STATUSES
-        ):
-            raise ValueError("Invalid account-link filter")
-        return value
+        return InventoryFilterSettings.validate_update(value) if value is not None else None
+
+
+class PauseRequest(BaseModel):
+    paused: StrictBool
+    duration: Literal["10m", "1h", "tomorrow"] | None = None
 
 
 class ProxyVerifyRequest(BaseModel):
@@ -187,6 +197,7 @@ async def get_status():
         "login": gui_manager.login.get_status(),
         "manual_mode": twitch_client.get_manual_mode_info(),
         "mining_enabled": twitch_client.is_mining_enabled(),
+        "pause": twitch_client.pause_info(),
     }
 
 
@@ -332,6 +343,11 @@ async def verify_proxy(request: ProxyVerifyRequest):
     import aiohttp
 
     proxy_url = request.proxy.strip()
+    if gui_manager is not None:
+        try:
+            proxy_url = gui_manager.settings.resolve_proxy(proxy_url)
+        except ValueError:
+            return {"success": False, "message": "Re-enter the proxy password"}
     if not proxy_url:
         return {"success": False, "message": "Proxy URL is empty"}
 
@@ -360,7 +376,8 @@ async def verify_proxy(request: ProxyVerifyRequest):
     except Exception as e:
         if twitch_client is not None:
             twitch_client.diagnostics.record("twitch_page", outcome="timeout" if isinstance(e, TimeoutError) else "connection")
-        return {"success": False, "message": f"Connection failed: {str(e)}"}
+        # Exception text can reveal internal hosts and ports; keep the reply fixed.
+        return {"success": False, "message": "Connection failed"}
 
 
 @app.post("/api/settings/test-discord")
@@ -427,11 +444,9 @@ async def test_telegram(request: TelegramTestRequest):
                 "success": False,
                 "message": "Failed to connect to Telegram. Please check your bot token and chat ID."
             }
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"Telegram error: {str(e)}"
-        }
+    except Exception:
+        # Exception text can contain the bot API URL, which embeds the token.
+        return {"success": False, "message": "Telegram connection failed."}
 @app.get("/api/version")
 async def get_version():
     """Get current application version and check for updates"""
@@ -587,6 +602,16 @@ async def trigger_close():
     return {"success": True}
 
 
+@app.post("/api/pause")
+async def update_paused(request: PauseRequest):
+    """Pause mining for a duration or until resumed; a restart always resumes."""
+    if not twitch_client:
+        raise HTTPException(status_code=503, detail="Twitch client not initialized")
+
+    twitch_client.set_paused(request.paused, request.duration)
+    return {"success": True, **twitch_client.pause_info()}
+
+
 @app.post("/api/mode/exit-manual")
 async def exit_manual_mode():
     """Exit manual mode and return to automatic channel selection"""
@@ -623,6 +648,7 @@ async def connect(sid, environ):
                 "login": gui_manager.login.get_status(),
                 "manual_mode": twitch_client.get_manual_mode_info(),
                 "mining_enabled": twitch_client.is_mining_enabled(),
+                "pause": twitch_client.pause_info(),
                 "current_drop": gui_manager.progress.get_current_drop(),
                 "wanted_items": gui_manager.get_wanted_game_tree(),
             },
@@ -668,7 +694,9 @@ async def get_wanted_items(sid):
 # Web files are in project_root/web/, we're in project_root/src/web/
 web_dir = Path(__file__).parent.parent.parent / "web"
 novnc_dir = Path("/usr/share/novnc")
+app.add_api_route("/session-viewer", SessionViewer(novnc_dir).page, methods=["GET"])
 if novnc_dir.exists():
+    app.mount(SessionViewer.ASSET_PATH, StaticFiles(directory=novnc_dir), name="novnc-login")
     app.mount("/static/novnc", StaticFiles(directory=novnc_dir), name="novnc")
 if web_dir.exists():
     static_dir = web_dir / "static"
