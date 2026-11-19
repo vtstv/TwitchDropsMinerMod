@@ -129,9 +129,8 @@ directory.
 
 ## TDM needs a new login after an upgrade
 
-Preserve the data directory and `cookies.jar`. Valid Android and browser sessions
-are restored. Smart TV sessions from v1.3.1/v1.3.2 and expired sessions require the
-[dashboard browser](authentication.md). Deleting all data is unnecessary.
+Keep your data directory. If TDM asks you to sign in again, follow the
+[Twitch login guide](authentication.md#sign-in).
 
 ## Renewal is retrying or asks for another login
 
@@ -210,8 +209,9 @@ clearing campaign cache does not reset it.
 
 Use **Test Connection** in Telegram settings and check any error shown. Start a
 conversation with the bot before testing, and verify the chat ID. Leave a saved token's
-field blank to reuse it. Failed notifications are not retried and do not reverse a
-successful drop claim. See [Telegram notifications](notifications.md).
+field blank to reuse it. TDM attempts each claim notification once. A failed attempt
+leaves the successful claim in place. TDM can retry a failed new-version alert on
+the next version check. See [Telegram notifications](notifications.md).
 
 ## Logs and reporting a problem
 

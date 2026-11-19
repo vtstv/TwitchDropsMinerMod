@@ -195,6 +195,16 @@ lang/                # Translation JSON files (20 languages)
   Keep confirmed bans and expiry callbacks across cache recovery until expiry or a
   confirmed null response. Cancel callbacks and clear account-owned ban state on
   identity replacement and shutdown.
+- Offline detection must not rely only on `stream-down`: a reconnect can lose the event
+  and full cleanup drops topics of channels missing from a game's top 20 directory results.
+  `ChannelService.refresh_watched_channel()` rechecks the watched channel in CHANNELS_FETCH
+  and keeps it tracked while online. A newer observation takes precedence over the earlier
+  discovery snapshot for that channel, preserving its campaign allowlist membership and
+  same-broadcast drop eligibility. A failed watch of the current stream calls `check_online()`.
+  `Channel.refresh_stream()` bounds both checks and preserves known state on an errored
+  response or timeout. A newer stream update invalidates older replies. Keep delayed
+  checks cancellable through the lookup and cancel them when retiring channel topics.
+  Regression: `tests/test_watched_channel_recovery.py`.
 
 **src/models/campaign.py** - Drop campaigns:
 
@@ -245,6 +255,10 @@ lang/                # Translation JSON files (20 languages)
 
 - REST API endpoints: `/api/status`, `/api/channels`, `/api/campaigns`, `/api/settings`, `/api/session`, `/api/session/finish`, `/api/session/retry`, `/api/session/logout`, `/api/session/vnc`, `/api/reload`, `/api/cache/clear`, `/api/close`, `/api/version`, `/api/history`, `/api/history/export.csv`, `/api/history/stats`
 - Socket.IO server for real-time bi-directional communication
+- The dashboard replaces its channel list on Socket.IO reconnect and batch updates.
+  Idle cleanup with no wanted games cancels retired channels' delayed online checks
+  before clearing the list. REST and reconnect snapshots derive the watching flag
+  from the manager's current watched channel ID.
 - Serves static web frontend from `web/` directory
 - Integrates with WebGUIManager via `set_managers()`
 - The Settings **Clear All Cache** action discards local campaign, channel, and other
@@ -360,6 +374,11 @@ lang/                # Translation JSON files (20 languages)
   Long additional reward names must wrap within the artwork row's information column
   rather than overflowing into the card's clipped area.
   Regression: `test_wanted_queue_frontend.py` and `test_wanted_items.py`.
+- The queue title's ⓘ button uses `aria-expanded` to control the ordering help.
+  `renderWantedOrderInfo()` describes the temporary order first, then the default saved
+  list, reward priority and fallback tiers. The temporary order can place a fallback
+  game first. Keep the text in step with `StreamSelector._get_wanted_game_tree()` and
+  the `gui.wanted.order_*` strings in every locale.
 - Mining list supports drag ordering and editable integer priority numbers. Clamp valid
   ranks to the list bounds; reject blank/fractional values without changing settings.
   Keep priority and remove-control labels translated and accessible. Regression tests in
@@ -391,6 +410,28 @@ lang/                # Translation JSON files (20 languages)
   change lines, language switching and broadcasts run only after a successful save.
   Regressions: `test_rejected_update_writes_prints_and_saves_nothing` and
   `test_failed_save_restores_every_field_and_defers_effects`.
+- Persist `mining_opt_ins_revision` atomically with the account-link override and
+  followed-channel option. Return both flags and the revision together. The dashboard
+  accepts complete non-stale snapshots so late POST or socket updates cannot revert
+  another tab's setting. Regressions live in `test_followed_channels*.py`.
+- `prefer_followed_channels` defaults false and accepts only booleans,
+  validated before any write; changes request a games update. When true,
+  `ChannelService.get_followed_live_channels(known_ids)` runs during CHANNELS_FETCH
+  under one 30-second bound: the raw `FOLLOWED_LIVE_QUERY` (`currentUser.followedLiveUsers`,
+  first 100, no pagination), batched stream info for channels not already tracked, and
+  a per-channel AvailableDrops check. Follow-only candidates require positive drop
+  evidence on discovery and later stream checks. The normal watched-stream refresh
+  and ban filtering still run. Apply the follow tie-break only between channels with
+  equal mining and ACL priority and equal sets of eligible (campaign ID, drop ID)
+  pairs. Keep the existing selection order between different reward sets. Manual
+  mode and a current hand-picked channel disable the tie-break. A manual reset,
+  stop, account reset or watching another channel ends hand-pick protection.
+  Failed follow or batch stream results leave the current follow set in place.
+  Failed individual drop checks skip unverified candidates. `ExitRequest` propagates,
+  and in-flight results are discarded after account reset or disabling the setting.
+  Raw GraphQL debugging is suppressed for the optional lookup and its child
+  requests. Tests: `test_followed_channels.py` and
+  `test_followed_channels_frontend.py`.
 - Drop-name ignore list (`drop_name_blacklist`), empty by default. Entries are literal,
   case-insensitive substrings entered one per line; whitespace and blanks are removed and
   duplicates are casefolded while preserving the first spelling/order.
@@ -409,6 +450,13 @@ lang/                # Translation JSON files (20 languages)
   timing, ACL/category, Mining list, prerequisites, claims, and ignore checks.
   Changes trigger game selection refresh. Keep the warning and save-failure feedback
   translated and safely rendered. Estimated minutes do not prove Twitch progress.
+- Automatic claims check Twitch's campaign link status independently of the mining
+  override. Only a nonempty drop containing exclusively badges/emotes can be claimed
+  while unlinked. Completed, link-deferred drops stay unclaimed in Inventory and leave
+  the Wanted Drops Queue. Their prerequisite dependents still require a successful
+  claim. A claim-ready websocket event preserves the claim ID and updates completion
+  without triggering post-claim polling, history or notifications. A later linked
+  inventory can claim the reward within the existing automatic-claim window.
 - Zero-minute subscription rewards are omitted from Inventory and Wanted Drops Queue;
   individually expired and non-mineable rewards are omitted from the queue without hiding
   upcoming or sequential rewards; successful claims refresh the queue immediately; the
@@ -481,6 +529,20 @@ lang/                # Translation JSON files (20 languages)
   mutation; restore the previous webhook on save failure. API validation errors must
   not echo submitted settings. Test Connection reports success only after saving.
   Preserve localized safe Help rendering and `tests/test_discord_*` coverage.
+- `notification_events` (`NotificationEventSettings`) selects alert events for both
+  providers: `drop_claimed` (default true) and `new_release` (default false). Only an
+  explicit `drop_claimed: false` suppresses claim alerts; settings problems never block a
+  claim. Partial updates merge; unknown keys or non-booleans fail before any write.
+  Persist the event revision with the choices so late settings responses or broadcasts
+  cannot overwrite newer choices in the dashboard.
+  `ReleaseService` (`src/services/release_service.py`) owns the GitHub latest-release
+  lookup for `/api/version` and the account-independent check task started in
+  `Twitch.run()` (startup, then every six hours). Read bodies through
+  `Diagnostics.read_bounded()`, compare versions numerically, link only to this
+  repository's matching release tag page, and persist each provider's highest
+  accepted version atomically in `last_notified_releases`. Provider failures retry
+  independently. Recheck the opt-in and provider settings after fetching from GitHub.
+  Keep delivery state in server settings only. Coverage: `tests/test_release_notifications.py`.
 - `tests/test_telegram_frontend.py`, `tests/test_telegram_api.py`, and
   `tests/test_telegram_integration.py` cover translated Help rendering, stored credentials,
   failed saves, disabling, all shared claim paths, and transport failures without sending
@@ -1021,8 +1083,9 @@ protocol rejection; preserve rejection and target-cleanup assertions.
   `uv`, update `src/version.py`, `pyproject.toml`, and `uv.lock` together, and validate all
   three before creating a release branch or tag. Release notes read `GEMINI_API_KEY`
   from the step environment and send it as a header, never as an argument or URL.
-  Preserve existing data-volume/session migration instructions. Prepare versioned
-  frontend cache keys through the authorized release workflow before deployment.
+  Keep data preservation and session recovery instructions in the current installation
+  and authentication guides. Prepare versioned frontend cache keys through the
+  authorized release workflow before deployment.
   Keep current Docker/helper examples and Settings-tab paths aligned in release
   documentation. Distinguish historical release behavior from current features and
   disclose host-name migration requirements without claiming live Twitch acceptance.
@@ -1117,6 +1180,11 @@ The application uses a web-based interface accessible via browser:
 - Installs dependencies from `pyproject.toml`, then removes installed pip and its vendored
   modules; Python's bundled `ensurepip` bootstrap wheel remains. Dependency changes
   require rebuilding the image.
+- Runs under `tini` as its entrypoint so orphans such as browser helpers are reaped
+  even without Docker's `--init`. Python must not become PID 1: it never reaps orphans,
+  and the zombies eventually exhaust the container's task limit (issue #212). Keep the
+  HEALTHCHECK in exec form so a timeout kills the probe rather than orphaning it.
+  Regression: `tests/test_dockerfile_init.py`.
 - Exposes port 8080
 - Health check on the public `/healthz` endpoint
 

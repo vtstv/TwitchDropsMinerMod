@@ -7,7 +7,7 @@ FROM python:alpine
 # Build arguments for metadata
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VERSION="2.5.0-mod"
+ARG VERSION="2.6.0-mod"
 
 # Labels following OCI Image Format Specification
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
@@ -42,7 +42,7 @@ COPY web/ ./web/
 
 # Login and renewal use private browsers; only the dashboard port is exposed.
 RUN apk upgrade --no-cache && \
-    apk add --no-cache chromium xvfb xvfb-run xauth openbox x11vnc xdotool tzdata && \
+    apk add --no-cache chromium xvfb xvfb-run xauth openbox x11vnc xdotool tzdata tini && \
     addgroup -g 10001 -S tdm-browser && \
     adduser -u 10001 -S -D -H -h /nonexistent -s /sbin/nologin -G tdm-browser tdm-browser && \
     pip install --no-cache-dir . && \
@@ -53,9 +53,13 @@ RUN apk upgrade --no-cache && \
 # Expose web port
 EXPOSE 8080
 
-# Health check
+# Health check. Exec form: a timeout kills the probe itself, not a shell that orphans it.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://[::1]:8080/healthz')" || exit 1
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://[::1]:8080/healthz')"]
+
+# Reap orphaned processes, such as browser helpers, with or without Docker's --init.
+# -s avoids tini's warning when --init makes it a child of Docker's own init.
+ENTRYPOINT ["/sbin/tini", "-s", "--"]
 
 # Run the application
 CMD ["python", "main.py"]

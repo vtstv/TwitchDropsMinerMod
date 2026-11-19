@@ -278,6 +278,7 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         drop_normal.is_claimed = False
         drop_normal.ends_at = datetime.max.replace(tzinfo=timezone.utc)
         drop_normal.is_mineable = True
+        drop_normal.awaiting_account_link = False
         drop_normal.benefits = [item_benefit]
         # Real get_wanted_unclaimed_benefits behavior
         drop_normal.get_wanted_unclaimed_benefits.side_effect = (
@@ -305,6 +306,7 @@ class TestModFeatures(unittest.IsolatedAsyncioTestCase):
         drop_all_drops.is_claimed = False
         drop_all_drops.ends_at = datetime.max.replace(tzinfo=timezone.utc)
         drop_all_drops.is_mineable = True
+        drop_all_drops.awaiting_account_link = False
         drop_all_drops.benefits = [item_benefit]
         drop_all_drops.get_wanted_unclaimed_benefits.side_effect = (
             lambda allowed: [b.name for b in drop_all_drops.benefits if b.is_wanted(allowed)]
